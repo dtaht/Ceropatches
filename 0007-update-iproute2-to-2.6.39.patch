@@ -1,0 +1,3552 @@
+From b2d6373ee6dd0bbb744a3f8d93010a315675ae0e Mon Sep 17 00:00:00 2001
+From: Dave Taht <d+bufferbloat@taht.net>
+Date: Sun, 24 Jul 2011 17:47:58 -0700
+Subject: [PATCH 07/13] update iproute2 to 2.6.39
+
+---
+ package/iproute2/Makefile                          |    8 +-
+ .../iproute2/patches/000-debian_patches_3.patch    | 1298 --------------
+ .../patches/001-iproute2-2.6.11_Config.patch       |    7 -
+ .../patches/002-iproute2-ipxfrm_no_sctp.patch      |   22 -
+ .../003-iproute2-get_dont_filter_cached.patch      |   10 -
+ package/iproute2/patches/005-flex-generated.patch  | 1767 --------------------
+ .../iproute2/patches/006-iproute2-tc_esfq.patch    |  298 ----
+ .../iproute2/patches/007-version_includes.patch    |   17 -
+ .../iproute2/patches/100-allow_pfifo_fast.patch    |   13 -
+ package/iproute2/patches/200-act_connmark.patch    |    8 +-
+ 10 files changed, 8 insertions(+), 3440 deletions(-)
+ delete mode 100644 package/iproute2/patches/000-debian_patches_3.patch
+ delete mode 100644 package/iproute2/patches/001-iproute2-2.6.11_Config.patch
+ delete mode 100644 package/iproute2/patches/002-iproute2-ipxfrm_no_sctp.patch
+ delete mode 100644 package/iproute2/patches/003-iproute2-get_dont_filter_cached.patch
+ delete mode 100644 package/iproute2/patches/005-flex-generated.patch
+ delete mode 100644 package/iproute2/patches/006-iproute2-tc_esfq.patch
+ delete mode 100644 package/iproute2/patches/007-version_includes.patch
+ delete mode 100644 package/iproute2/patches/100-allow_pfifo_fast.patch
+
+diff --git a/package/iproute2/Makefile b/package/iproute2/Makefile
+index 7ffdfc0..c0973c7 100644
+--- a/package/iproute2/Makefile
++++ b/package/iproute2/Makefile
+@@ -8,12 +8,12 @@
+ include $(TOPDIR)/rules.mk
+ 
+ PKG_NAME:=iproute2
+-PKG_VERSION:=2.6.35
+-PKG_RELEASE:=3
++PKG_VERSION:=2.6.39
++PKG_RELEASE:=4
+ 
+-PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION).tar.bz2
++PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION).tar.gz
+ PKG_SOURCE_URL:=http://devresources.linux-foundation.org/dev/iproute2/download/
+-PKG_MD5SUM:=b0f281b3124bf04669e18f5fe16d4934
++PKG_MD5SUM:=8a3b6bc77c2ecf752284aa4a6fc630a6
+ PKG_BUILD_PARALLEL:=1
+ 
+ PKG_BUILD_DIR:=$(BUILD_DIR)/iproute2-$(PKG_VERSION)
+diff --git a/package/iproute2/patches/000-debian_patches_3.patch b/package/iproute2/patches/000-debian_patches_3.patch
+deleted file mode 100644
+index 8e688f8..0000000
+--- a/package/iproute2/patches/000-debian_patches_3.patch
++++ /dev/null
+@@ -1,1298 +0,0 @@
+----
+- Makefile                  |    4 
+- doc/Makefile              |    8 
+- doc/ip-cref.tex           |   16 +
+- include/linux/pkt_sched.h |  518 ++++++++++++++++++++++++++++++++++++++++++++++
+- ip/iptunnel.c             |    2 
+- misc/Makefile             |    3 
+- tc/Makefile               |    1 
+- tc/q_htb.c                |  308 +++++++++++++++++++++++++++
+- tc/q_wrr.c                |  322 ++++++++++++++++++++++++++++
+- 9 files changed, 1177 insertions(+), 5 deletions(-)
+-
+---- a/doc/ip-cref.tex
+-+++ b/doc/ip-cref.tex
+-@@ -1307,6 +1307,19 @@ peers are allowed to send to us.
+- --- \threeonly the clamp for congestion window. It is ignored if the \verb|lock|
+-     flag is not used.
+- 
+-+\item \verb|hoplimit NUMBER|
+-+
+-+--- [2.5.74+ only] Hop limit on the path to this destination. If it is not
+-+    given, Linux uses the value selected with \verb|sysctl| variable
+-+    \verb|net/ipv4/ip_default_ttl|.
+-+
+-+\item \verb|initcwnd NUMBER|
+-+
+-+--- [2.5.70+ only] Initial congestion window size when establishing
+-+    connections to this destination. This value is multiplied with the
+-+    MSS (``Maximal Segment Size'') for the connection to get the actual
+-+    window size. If it is not given (or set to zero), Linux uses the
+-+    values specified in~\cite{RFC2414}.
+- 
+- \item \verb|advmss NUMBER|
+- 
+-@@ -2665,6 +2678,9 @@ http://www.cisco.com/univercd/cc/td/doc/
+- \bibitem{RFC2414}  M.~Allman, S.~Floyd, C.~Partridge.
+- ``Increasing TCP's Initial Window'', RFC-2414.
+- 
+-+\bibitem{RFC2414}  M.~Allman, S.~Floyd, C.~Partridge.
+-+``Increasing TCP's Initial Window'', RFC-2414.
+-+
+- \end{thebibliography}
+- 
+- 
+---- a/doc/Makefile
+-+++ b/doc/Makefile
+-@@ -14,6 +14,7 @@ PAGESIZE=a4
+- PAGESPERPAGE=2
+- 
+- HTMLFILES=$(subst .sgml,.html,$(shell echo *.sgml))
+-+TXTFILES=$(subst .sgml,.txt,$(shell echo *.sgml))
+- DVIFILES=$(subst .ps,.dvi,$(PSFILES))
+- 
+- 
+-@@ -23,6 +24,8 @@ pstwocol: $(PSFILES)
+- 
+- html: $(HTMLFILES)
+- 
+-+txt: $(TXTFILES)
+-+
+- dvi: $(DVIFILES)
+- 
+- print: $(PSFILES)
+-@@ -47,9 +50,12 @@ print: $(PSFILES)
+- %.html: %.sgml
+- 	$(SGML2HTML) $<
+- 
+-+%.txt: %.html
+-+	lynx -nolist -dump $< > $@
+-+
+- install:
+- 	install -m 0644 $(shell echo *.tex) $(DESTDIR)$(DOCDIR)
+- 	install -m 0644 $(shell echo *.sgml) $(DESTDIR)$(DOCDIR)
+- 
+- clean:
+--	rm -f *.aux *.log *.toc $(PSFILES) $(DVIFILES) *.html
+-+	rm -f *.aux *.log *.toc $(PSFILES) $(DVIFILES) *.html $(TXTFILES)
+---- a/include/linux/pkt_sched.h
+-+++ b/include/linux/pkt_sched.h
+-@@ -1,3 +1,409 @@
+-+#if 0
+-+#ifndef __LINUX_PKT_SCHED_H
+-+#define __LINUX_PKT_SCHED_H
+-+
+-+/* Logical priority bands not depending on specific packet scheduler.
+-+   Every scheduler will map them to real traffic classes, if it has
+-+   no more precise mechanism to classify packets.
+-+
+-+   These numbers have no special meaning, though their coincidence
+-+   with obsolete IPv6 values is not occasional :-). New IPv6 drafts
+-+   preferred full anarchy inspired by diffserv group.
+-+
+-+   Note: TC_PRIO_BESTEFFORT does not mean that it is the most unhappy
+-+   class, actually, as rule it will be handled with more care than
+-+   filler or even bulk.
+-+ */
+-+
+-+#define TC_PRIO_BESTEFFORT		0
+-+#define TC_PRIO_FILLER			1
+-+#define TC_PRIO_BULK			2
+-+#define TC_PRIO_INTERACTIVE_BULK	4
+-+#define TC_PRIO_INTERACTIVE		6
+-+#define TC_PRIO_CONTROL			7
+-+
+-+#define TC_PRIO_MAX			15
+-+
+-+/* Generic queue statistics, available for all the elements.
+-+   Particular schedulers may have also their private records.
+-+ */
+-+
+-+struct tc_stats
+-+{
+-+	__u64	bytes;			/* NUmber of enqueues bytes */
+-+	__u32	packets;		/* Number of enqueued packets	*/
+-+	__u32	drops;			/* Packets dropped because of lack of resources */
+-+	__u32	overlimits;		/* Number of throttle events when this
+-+					 * flow goes out of allocated bandwidth */
+-+	__u32	bps;			/* Current flow byte rate */
+-+	__u32	pps;			/* Current flow packet rate */
+-+	__u32	qlen;
+-+	__u32	backlog;
+-+#ifdef __KERNEL__
+-+	spinlock_t *lock;
+-+#endif
+-+};
+-+
+-+struct tc_estimator
+-+{
+-+	char		interval;
+-+	unsigned char	ewma_log;
+-+};
+-+
+-+/* "Handles"
+-+   ---------
+-+
+-+    All the traffic control objects have 32bit identifiers, or "handles".
+-+
+-+    They can be considered as opaque numbers from user API viewpoint,
+-+    but actually they always consist of two fields: major and
+-+    minor numbers, which are interpreted by kernel specially,
+-+    that may be used by applications, though not recommended.
+-+
+-+    F.e. qdisc handles always have minor number equal to zero,
+-+    classes (or flows) have major equal to parent qdisc major, and
+-+    minor uniquely identifying class inside qdisc.
+-+
+-+    Macros to manipulate handles:
+-+ */
+-+
+-+#define TC_H_MAJ_MASK (0xFFFF0000U)
+-+#define TC_H_MIN_MASK (0x0000FFFFU)
+-+#define TC_H_MAJ(h) ((h)&TC_H_MAJ_MASK)
+-+#define TC_H_MIN(h) ((h)&TC_H_MIN_MASK)
+-+#define TC_H_MAKE(maj,min) (((maj)&TC_H_MAJ_MASK)|((min)&TC_H_MIN_MASK))
+-+
+-+#define TC_H_UNSPEC	(0U)
+-+#define TC_H_ROOT	(0xFFFFFFFFU)
+-+#define TC_H_INGRESS    (0xFFFFFFF1U)
+-+
+-+struct tc_ratespec
+-+{
+-+	unsigned char	cell_log;
+-+	unsigned char	__reserved;
+-+	unsigned short	feature;
+-+	short		addend;
+-+	unsigned short	mpu;
+-+	__u32		rate;
+-+};
+-+
+-+/* FIFO section */
+-+
+-+struct tc_fifo_qopt
+-+{
+-+	__u32	limit;	/* Queue length: bytes for bfifo, packets for pfifo */
+-+};
+-+
+-+/* PRIO section */
+-+
+-+#define TCQ_PRIO_BANDS	16
+-+
+-+struct tc_prio_qopt
+-+{
+-+	int	bands;			/* Number of bands */
+-+	__u8	priomap[TC_PRIO_MAX+1];	/* Map: logical priority -> PRIO band */
+-+};
+-+
+-+/* CSZ section */
+-+
+-+struct tc_csz_qopt
+-+{
+-+	int		flows;		/* Maximal number of guaranteed flows */
+-+	unsigned char	R_log;		/* Fixed point position for round number */
+-+	unsigned char	delta_log;	/* Log of maximal managed time interval */
+-+	__u8		priomap[TC_PRIO_MAX+1];	/* Map: logical priority -> CSZ band */
+-+};
+-+
+-+struct tc_csz_copt
+-+{
+-+	struct tc_ratespec slice;
+-+	struct tc_ratespec rate;
+-+	struct tc_ratespec peakrate;
+-+	__u32		limit;
+-+	__u32		buffer;
+-+	__u32		mtu;
+-+};
+-+
+-+enum
+-+{
+-+	TCA_CSZ_UNSPEC,
+-+	TCA_CSZ_PARMS,
+-+	TCA_CSZ_RTAB,
+-+	TCA_CSZ_PTAB,
+-+};
+-+
+-+/* TBF section */
+-+
+-+struct tc_tbf_qopt
+-+{
+-+	struct tc_ratespec rate;
+-+	struct tc_ratespec peakrate;
+-+	__u32		limit;
+-+	__u32		buffer;
+-+	__u32		mtu;
+-+};
+-+
+-+enum
+-+{
+-+	TCA_TBF_UNSPEC,
+-+	TCA_TBF_PARMS,
+-+	TCA_TBF_RTAB,
+-+	TCA_TBF_PTAB,
+-+};
+-+
+-+
+-+/* TEQL section */
+-+
+-+/* TEQL does not require any parameters */
+-+
+-+/* SFQ section */
+-+
+-+struct tc_sfq_qopt
+-+{
+-+	unsigned	quantum;	/* Bytes per round allocated to flow */
+-+	int		perturb_period;	/* Period of hash perturbation */
+-+	__u32		limit;		/* Maximal packets in queue */
+-+	unsigned	divisor;	/* Hash divisor  */
+-+	unsigned	flows;		/* Maximal number of flows  */
+-+};
+-+
+-+/*
+-+ *  NOTE: limit, divisor and flows are hardwired to code at the moment.
+-+ *
+-+ *	limit=flows=128, divisor=1024;
+-+ *
+-+ *	The only reason for this is efficiency, it is possible
+-+ *	to change these parameters in compile time.
+-+ */
+-+
+-+/* RED section */
+-+
+-+enum
+-+{
+-+	TCA_RED_UNSPEC,
+-+	TCA_RED_PARMS,
+-+	TCA_RED_STAB,
+-+};
+-+
+-+struct tc_red_qopt
+-+{
+-+	__u32		limit;		/* HARD maximal queue length (bytes)	*/
+-+	__u32		qth_min;	/* Min average length threshold (bytes) */
+-+	__u32		qth_max;	/* Max average length threshold (bytes) */
+-+	unsigned char   Wlog;		/* log(W)		*/
+-+	unsigned char   Plog;		/* log(P_max/(qth_max-qth_min))	*/
+-+	unsigned char   Scell_log;	/* cell size for idle damping */
+-+	unsigned char	flags;
+-+#define TC_RED_ECN	1
+-+};
+-+
+-+struct tc_red_xstats
+-+{
+-+	__u32           early;          /* Early drops */
+-+	__u32           pdrop;          /* Drops due to queue limits */
+-+	__u32           other;          /* Drops due to drop() calls */
+-+	__u32           marked;         /* Marked packets */
+-+};
+-+
+-+/* GRED section */
+-+
+-+#define MAX_DPs 16
+-+
+-+enum
+-+{
+-+       TCA_GRED_UNSPEC,
+-+       TCA_GRED_PARMS,
+-+       TCA_GRED_STAB,
+-+       TCA_GRED_DPS,
+-+};
+-+
+-+#define TCA_SET_OFF TCA_GRED_PARMS
+-+struct tc_gred_qopt
+-+{
+-+       __u32           limit;          /* HARD maximal queue length (bytes)
+-+*/
+-+       __u32           qth_min;        /* Min average length threshold (bytes)
+-+*/
+-+       __u32           qth_max;        /* Max average length threshold (bytes)
+-+*/
+-+       __u32           DP;             /* upto 2^32 DPs */
+-+       __u32           backlog;
+-+       __u32           qave;
+-+       __u32           forced;
+-+       __u32           early;
+-+       __u32           other;
+-+       __u32           pdrop;
+-+
+-+       unsigned char   Wlog;           /* log(W)               */
+-+       unsigned char   Plog;           /* log(P_max/(qth_max-qth_min)) */
+-+       unsigned char   Scell_log;      /* cell size for idle damping */
+-+       __u8            prio;		/* prio of this VQ */
+-+       __u32	packets;
+-+       __u32	bytesin;
+-+};
+-+/* gred setup */
+-+struct tc_gred_sopt
+-+{
+-+       __u32           DPs;
+-+       __u32           def_DP;
+-+       __u8            grio;
+-+};
+-+
+-+/* HTB section */
+-+#define TC_HTB_NUMPRIO		8
+-+#define TC_HTB_MAXDEPTH		8
+-+#define TC_HTB_PROTOVER		3 /* the same as HTB and TC's major */
+-+
+-+struct tc_htb_opt
+-+{
+-+	struct tc_ratespec 	rate;
+-+	struct tc_ratespec 	ceil;
+-+	__u32	buffer;
+-+	__u32	cbuffer;
+-+	__u32	quantum;
+-+	__u32	level;		/* out only */
+-+	__u32	prio;
+-+};
+-+struct tc_htb_glob
+-+{
+-+	__u32 version;		/* to match HTB/TC */
+-+    	__u32 rate2quantum;	/* bps->quantum divisor */
+-+    	__u32 defcls;		/* default class number */
+-+	__u32 debug;		/* debug flags */
+-+
+-+	/* stats */
+-+	__u32 direct_pkts; /* count of non shapped packets */
+-+};
+-+enum
+-+{
+-+	TCA_HTB_UNSPEC,
+-+	TCA_HTB_PARMS,
+-+	TCA_HTB_INIT,
+-+	TCA_HTB_CTAB,
+-+	TCA_HTB_RTAB,
+-+};
+-+struct tc_htb_xstats
+-+{
+-+	__u32 lends;
+-+	__u32 borrows;
+-+	__u32 giants;	/* too big packets (rate will not be accurate) */
+-+	__u32 tokens;
+-+	__u32 ctokens;
+-+};
+-+
+-+/* CBQ section */
+-+
+-+#define TC_CBQ_MAXPRIO		8
+-+#define TC_CBQ_MAXLEVEL		8
+-+#define TC_CBQ_DEF_EWMA		5
+-+
+-+struct tc_cbq_lssopt
+-+{
+-+	unsigned char	change;
+-+	unsigned char	flags;
+-+#define TCF_CBQ_LSS_BOUNDED	1
+-+#define TCF_CBQ_LSS_ISOLATED	2
+-+	unsigned char  	ewma_log;
+-+	unsigned char  	level;
+-+#define TCF_CBQ_LSS_FLAGS	1
+-+#define TCF_CBQ_LSS_EWMA	2
+-+#define TCF_CBQ_LSS_MAXIDLE	4
+-+#define TCF_CBQ_LSS_MINIDLE	8
+-+#define TCF_CBQ_LSS_OFFTIME	0x10
+-+#define TCF_CBQ_LSS_AVPKT	0x20
+-+	__u32		maxidle;
+-+	__u32		minidle;
+-+	__u32		offtime;
+-+	__u32		avpkt;
+-+};
+-+
+-+struct tc_cbq_wrropt
+-+{
+-+	unsigned char	flags;
+-+	unsigned char	priority;
+-+	unsigned char	cpriority;
+-+	unsigned char	__reserved;
+-+	__u32		allot;
+-+	__u32		weight;
+-+};
+-+
+-+struct tc_cbq_ovl
+-+{
+-+	unsigned char	strategy;
+-+#define	TC_CBQ_OVL_CLASSIC	0
+-+#define	TC_CBQ_OVL_DELAY	1
+-+#define	TC_CBQ_OVL_LOWPRIO	2
+-+#define	TC_CBQ_OVL_DROP		3
+-+#define	TC_CBQ_OVL_RCLASSIC	4
+-+	unsigned char	priority2;
+-+	__u32		penalty;
+-+};
+-+
+-+struct tc_cbq_police
+-+{
+-+	unsigned char	police;
+-+	unsigned char	__res1;
+-+	unsigned short	__res2;
+-+};
+-+
+-+struct tc_cbq_fopt
+-+{
+-+	__u32		split;
+-+	__u32		defmap;
+-+	__u32		defchange;
+-+};
+-+
+-+struct tc_cbq_xstats
+-+{
+-+	__u32		borrows;
+-+	__u32		overactions;
+-+	__s32		avgidle;
+-+	__s32		undertime;
+-+};
+-+
+-+enum
+-+{
+-+	TCA_CBQ_UNSPEC,
+-+	TCA_CBQ_LSSOPT,
+-+	TCA_CBQ_WRROPT,
+-+	TCA_CBQ_FOPT,
+-+	TCA_CBQ_OVL_STRATEGY,
+-+	TCA_CBQ_RATE,
+-+	TCA_CBQ_RTAB,
+-+	TCA_CBQ_POLICE,
+-+};
+-+
+-+#define TCA_CBQ_MAX	TCA_CBQ_POLICE
+-+
+-+/* dsmark section */
+-+
+-+enum {
+-+	TCA_DSMARK_UNSPEC,
+-+	TCA_DSMARK_INDICES,
+-+	TCA_DSMARK_DEFAULT_INDEX,
+-+	TCA_DSMARK_SET_TC_INDEX,
+-+	TCA_DSMARK_MASK,
+-+	TCA_DSMARK_VALUE
+-+};
+-+
+-+#define TCA_DSMARK_MAX TCA_DSMARK_VALUE
+-+
+-+/* ATM  section */
+-+
+-+enum {
+-+	TCA_ATM_UNSPEC,
+-+	TCA_ATM_FD,		/* file/socket descriptor */
+-+	TCA_ATM_PTR,		/* pointer to descriptor - later */
+-+	TCA_ATM_HDR,		/* LL header */
+-+	TCA_ATM_EXCESS,		/* excess traffic class (0 for CLP)  */
+-+	TCA_ATM_ADDR,		/* PVC address (for output only) */
+-+	TCA_ATM_STATE		/* VC state (ATM_VS_*; for output only) */
+-+};
+-+
+-+#define TCA_ATM_MAX	TCA_ATM_STATE
+-+
+-+#endif
+-+#endif
+- #ifndef __LINUX_PKT_SCHED_H
+- #define __LINUX_PKT_SCHED_H
+- 
+-@@ -481,4 +887,116 @@ struct tc_drr_stats {
+- 	__u32	deficit;
+- };
+- 
+-+/* WRR section */
+-+
+-+/* Other includes */
+-+#include <linux/if_ether.h>
+-+
+-+// A sub weight and of a class
+-+// All numbers are represented as parts of (2^64-1).
+-+struct tc_wrr_class_weight {
+-+	__u64 val;	// Current value			(0 is not valid)
+-+	__u64 decr;	// Value pr bytes			(2^64-1 is not valid)
+-+	__u64 incr;	// Value pr seconds			(2^64-1 is not valid)
+-+	__u64 min;	// Minimal value			(0 is not valid)
+-+	__u64 max;	// Minimal value			(0 is not valid)
+-+
+-+// The time where the above information was correct:
+-+	time_t tim;
+-+};
+-+
+-+// Packet send when modifying a class:
+-+struct tc_wrr_class_modf {
+-+	// Not-valid values are ignored.
+-+	struct tc_wrr_class_weight weight1;
+-+	struct tc_wrr_class_weight weight2;
+-+};
+-+
+-+// Packet returned when quering a class:
+-+struct tc_wrr_class_stats {
+-+	char used;	// If this is false the information below is invalid
+-+
+-+	struct tc_wrr_class_modf class_modf;
+-+
+-+	unsigned char addr[ETH_ALEN];
+-+	char usemac;    // True if addr is a MAC address, else it is an IP address
+-+			// (this value is only for convience, it is always the same
+-+			//  value as in the qdisc)
+-+	int heappos;	// Current heap position or 0 if not in heap
+-+	__u64 penal_ls;	// Penalty value in heap (ls)
+-+	__u64 penal_ms;	// Penalty value in heap (ms)
+-+};
+-+
+-+// Qdisc-wide penalty information (boolean values - 2 not valid)
+-+struct tc_wrr_qdisc_weight {
+-+	char weight_mode;	// 0=No automatic change to weight
+-+				// 1=Decrease normally
+-+				// 2=Also multiply with number of machines
+-+				// 3=Instead multiply with priority divided
+-+				//   with priority of the other.
+-+				// -1=no change
+-+};
+-+
+-+// Packet send when modifing a qdisc:
+-+struct tc_wrr_qdisc_modf {
+-+	// Not-valid values are ignored:
+-+	struct tc_wrr_qdisc_weight weight1;
+-+	struct tc_wrr_qdisc_weight weight2;
+-+};
+-+
+-+// Packet send when creating a qdisc:
+-+struct tc_wrr_qdisc_crt {
+-+	struct tc_wrr_qdisc_modf qdisc_modf;
+-+
+-+	char srcaddr;	// 1=lookup source, 0=lookup destination
+-+	char usemac;	// 1=Classify on MAC addresses, 0=classify on IP
+-+	char usemasq;	// 1=Classify based on masqgrading - only valid
+-+			//   if usemac is zero
+-+	int bands_max;	// Maximal number of bands (i.e.: classes)
+-+	int proxy_maxconn;// If differnt from 0 then we support proxy remapping
+-+			// of packets. And this is the number of maximal
+-+			// concurrent proxy connections.
+-+};
+-+
+-+// Packet returned when quering a qdisc:
+-+struct tc_wrr_qdisc_stats {
+-+	struct tc_wrr_qdisc_crt qdisc_crt;
+-+	int proxy_curconn;
+-+	int nodes_in_heap;	// Current number of bands wanting to send something
+-+	int bands_cur;		// Current number of bands used (i.e.: MAC/IP addresses seen)
+-+	int bands_reused;	// Number of times this band has been reused.
+-+	int packets_requed;	// Number of times packets have been requeued.
+-+	__u64 priosum;		// Sum of priorities in heap where 1 is 2^32
+-+};
+-+
+-+struct tc_wrr_qdisc_modf_std {
+-+	// This indicates which of the tc_wrr_qdisc_modf structers this is:
+-+	char proxy; // 0=This struct
+-+
+-+	// Should we also change a class?
+-+	char change_class;
+-+
+-+	// Only valid if change_class is false
+-+	struct tc_wrr_qdisc_modf qdisc_modf;
+-+
+-+	// Only valid if change_class is true:
+-+	unsigned char addr[ETH_ALEN]; // Class to change (non-used bytes should be 0)
+-+	struct tc_wrr_class_modf class_modf; // The change
+-+};
+-+
+-+// Used for proxyrempping:
+-+struct tc_wrr_qdisc_modf_proxy {
+-+	// This indicates which of the tc_wrr_qdisc_modf structers this is:
+-+	char proxy;     // 1=This struct
+-+
+-+	// This is 1 if the proxyremap information should be reset
+-+	char reset;
+-+
+-+	// changec is the number of elements in changes.
+-+	int changec;
+-+
+-+	// This is an array of type ProxyRemapBlock:
+-+	long changes[0];
+-+};
+-+
+- #endif
+---- a/ip/iptunnel.c
+-+++ b/ip/iptunnel.c
+-@@ -130,7 +130,7 @@ static int parse_args(int argc, char **a
+- 			NEXT_ARG();
+- 			p->o_flags |= GRE_KEY;
+- 			if (strchr(*argv, '.'))
+--				p->o_key = get_addr32(*argv);
+-+				p->i_key = get_addr32(*argv);
+- 			else {
+- 				if (get_unsigned(&uval, *argv, 0)<0) {
+- 					fprintf(stderr, "invalid value of \"okey\"\n");
+---- a/Makefile
+-+++ b/Makefile
+-@@ -57,7 +57,7 @@ install: all
+- 		$(DESTDIR)$(DOCDIR)/examples
+- 	install -m 0644 $(shell find examples/diffserv -maxdepth 1 -type f) \
+- 		$(DESTDIR)$(DOCDIR)/examples/diffserv
+--	@for i in $(SUBDIRS) doc; do $(MAKE) -C $$i install; done
+-+	@set -e; for i in $(SUBDIRS) doc; do $(MAKE) -C $$i install; done
+- 	install -m 0644 $(shell find etc/iproute2 -maxdepth 1 -type f) $(DESTDIR)$(CONFDIR)
+- 	install -m 0755 -d $(DESTDIR)$(MANDIR)/man8
+- 	install -m 0644 $(shell find man/man8 -maxdepth 1 -type f) $(DESTDIR)$(MANDIR)/man8
+-@@ -75,7 +75,7 @@ snapshot:
+- 
+- clean:
+- 	rm -f cscope.*
+--	@for i in $(SUBDIRS) doc; \
+-+	@set -e; for i in $(SUBDIRS) doc; \
+- 	do $(MAKE) $(MFLAGS) -C $$i clean; done
+- 
+- clobber: clean
+---- a/misc/Makefile
+-+++ b/misc/Makefile
+-@@ -1,7 +1,8 @@
+- SSOBJ=ss.o ssfilter.o
+- LNSTATOBJ=lnstat.o lnstat_util.o
+- 
+--TARGETS=ss nstat ifstat rtacct arpd lnstat
+-+#TARGETS=ss nstat ifstat rtacct arpd lnstat
+-+TARGETS=ss nstat rtacct lnstat
+- 
+- include ../Config
+- 
+---- a/tc/Makefile
+-+++ b/tc/Makefile
+-@@ -15,6 +15,7 @@ TCMODULES += q_cbq.o
+- TCMODULES += q_rr.o
+- TCMODULES += q_multiq.o
+- TCMODULES += q_netem.o
+-+TCMODULES += q_wrr.o
+- TCMODULES += f_rsvp.o
+- TCMODULES += f_u32.o
+- TCMODULES += f_route.o
+---- a/tc/q_htb.c
+-+++ b/tc/q_htb.c
+-@@ -1,3 +1,311 @@
+-+#if 0
+-+/*
+-+ * q_htb.c		HTB.
+-+ *
+-+ *		This program is free software; you can redistribute it and/or
+-+ *		modify it under the terms of the GNU General Public License
+-+ *		as published by the Free Software Foundation; either version
+-+ *		2 of the License, or (at your option) any later version.
+-+ *
+-+ * Authors:	Martin Devera, devik@cdi.cz
+-+ *
+-+ */
+-+
+-+#include <stdio.h>
+-+#include <stdlib.h>
+-+#include <unistd.h>
+-+#include <syslog.h>
+-+#include <fcntl.h>
+-+#include <sys/socket.h>
+-+#include <netinet/in.h>
+-+#include <arpa/inet.h>
+-+#include <string.h>
+-+
+-+#include "utils.h"
+-+#include "tc_util.h"
+-+
+-+#define HTB_TC_VER 0x30003
+-+#if HTB_TC_VER >> 16 != TC_HTB_PROTOVER
+-+#error "Different kernel and TC HTB versions"
+-+#endif
+-+
+-+static void explain(void)
+-+{
+-+	fprintf(stderr, "Usage: ... qdisc add ... htb [default N] [r2q N]\n"
+-+		" default  minor id of class to which unclassified packets are sent {0}\n"
+-+		" r2q      DRR quantums are computed as rate in Bps/r2q {10}\n"
+-+		" debug    string of 16 numbers each 0-3 {0}\n\n"
+-+		"... class add ... htb rate R1 burst B1 [prio P] [slot S] [pslot PS]\n"
+-+		"                      [ceil R2] [cburst B2] [mtu MTU] [quantum Q]\n"
+-+		" rate     rate allocated to this class (class can still borrow)\n"
+-+		" burst    max bytes burst which can be accumulated during idle period {computed}\n"
+-+		" ceil     definite upper class rate (no borrows) {rate}\n"
+-+		" cburst   burst but for ceil {computed}\n"
+-+		" mtu      max packet size we create rate map for {1600}\n"
+-+		" prio     priority of leaf; lower are served first {0}\n"
+-+		" quantum  how much bytes to serve from leaf at once {use r2q}\n"
+-+		"\nTC HTB version %d.%d\n",HTB_TC_VER>>16,HTB_TC_VER&0xffff
+-+		);
+-+}
+-+
+-+static void explain1(char *arg)
+-+{
+-+    fprintf(stderr, "Illegal \"%s\"\n", arg);
+-+    explain();
+-+}
+-+
+-+
+-+#define usage() return(-1)
+-+
+-+static int htb_parse_opt(struct qdisc_util *qu, int argc, char **argv, struct nlmsghdr *n)
+-+{
+-+	struct tc_htb_glob opt;
+-+	struct rtattr *tail;
+-+	unsigned i; char *p;
+-+	memset(&opt,0,sizeof(opt));
+-+	opt.rate2quantum = 10;
+-+	opt.version = 3;
+-+
+-+	while (argc > 0) {
+-+		if (matches(*argv, "r2q") == 0) {
+-+		    NEXT_ARG();
+-+		    if (get_u32(&opt.rate2quantum, *argv, 10)) {
+-+			explain1("r2q"); return -1;
+-+		    }
+-+		} else if (matches(*argv, "default") == 0) {
+-+		    NEXT_ARG();
+-+		    if (get_u32(&opt.defcls, *argv, 16)) {
+-+			explain1("default"); return -1;
+-+		    }
+-+		} else if (matches(*argv, "debug") == 0) {
+-+		    NEXT_ARG(); p = *argv;
+-+		    for (i=0; i<16; i++,p++) {
+-+			if (*p<'0' || *p>'3') break;
+-+			opt.debug |= (*p-'0')<<(2*i);
+-+		    }
+-+		} else {
+-+			fprintf(stderr, "What is \"%s\"?\n", *argv);
+-+			explain();
+-+			return -1;
+-+		}
+-+		argc--; argv++;
+-+	}
+-+	tail = (struct rtattr*)(((void*)n)+NLMSG_ALIGN(n->nlmsg_len));
+-+	addattr_l(n, 1024, TCA_OPTIONS, NULL, 0);
+-+	addattr_l(n, 2024, TCA_HTB_INIT, &opt, NLMSG_ALIGN(sizeof(opt)));
+-+	tail->rta_len = (((void*)n)+NLMSG_ALIGN(n->nlmsg_len)) - (void*)tail;
+-+	return 0;
+-+}
+-+
+-+static int htb_parse_class_opt(struct qdisc_util *qu, int argc, char **argv, struct nlmsghdr *n)
+-+{
+-+	int ok=0;
+-+	struct tc_htb_opt opt;
+-+	__u32 rtab[256],ctab[256];
+-+	unsigned buffer=0,cbuffer=0;
+-+	int cell_log=-1,ccell_log = -1,mtu;
+-+	struct rtattr *tail;
+-+
+-+	memset(&opt, 0, sizeof(opt)); mtu = 1600; /* eth packet len */
+-+
+-+	while (argc > 0) {
+-+		if (matches(*argv, "prio") == 0) {
+-+			NEXT_ARG();
+-+			if (get_u32(&opt.prio, *argv, 10)) {
+-+				explain1("prio"); return -1;
+-+			}
+-+			ok++;
+-+		} else if (matches(*argv, "mtu") == 0) {
+-+			NEXT_ARG();
+-+			if (get_u32(&mtu, *argv, 10)) {
+-+				explain1("mtu"); return -1;
+-+			}
+-+		} else if (matches(*argv, "quantum") == 0) {
+-+			NEXT_ARG();
+-+			if (get_u32(&opt.quantum, *argv, 10)) {
+-+				explain1("quantum"); return -1;
+-+			}
+-+		} else if (matches(*argv, "burst") == 0 ||
+-+			strcmp(*argv, "buffer") == 0 ||
+-+			strcmp(*argv, "maxburst") == 0) {
+-+			NEXT_ARG();
+-+			if (get_size_and_cell(&buffer, &cell_log, *argv) < 0) {
+-+				explain1("buffer");
+-+				return -1;
+-+			}
+-+			ok++;
+-+		} else if (matches(*argv, "cburst") == 0 ||
+-+			strcmp(*argv, "cbuffer") == 0 ||
+-+			strcmp(*argv, "cmaxburst") == 0) {
+-+			NEXT_ARG();
+-+			if (get_size_and_cell(&cbuffer, &ccell_log, *argv) < 0) {
+-+				explain1("cbuffer");
+-+				return -1;
+-+			}
+-+			ok++;
+-+		} else if (strcmp(*argv, "ceil") == 0) {
+-+			NEXT_ARG();
+-+			if (opt.ceil.rate) {
+-+				fprintf(stderr, "Double \"ceil\" spec\n");
+-+				return -1;
+-+			}
+-+			if (get_rate(&opt.ceil.rate, *argv)) {
+-+				explain1("ceil");
+-+				return -1;
+-+			}
+-+			ok++;
+-+		} else if (strcmp(*argv, "rate") == 0) {
+-+			NEXT_ARG();
+-+			if (opt.rate.rate) {
+-+				fprintf(stderr, "Double \"rate\" spec\n");
+-+				return -1;
+-+			}
+-+			if (get_rate(&opt.rate.rate, *argv)) {
+-+				explain1("rate");
+-+				return -1;
+-+			}
+-+			ok++;
+-+		} else if (strcmp(*argv, "help") == 0) {
+-+			explain();
+-+			return -1;
+-+		} else {
+-+			fprintf(stderr, "What is \"%s\"?\n", *argv);
+-+			explain();
+-+			return -1;
+-+		}
+-+		argc--; argv++;
+-+	}
+-+
+-+/*	if (!ok)
+-+		return 0;*/
+-+
+-+	if (opt.rate.rate == 0) {
+-+		fprintf(stderr, "\"rate\" is required.\n");
+-+		return -1;
+-+	}
+-+	/* if ceil params are missing, use the same as rate */
+-+	if (!opt.ceil.rate) opt.ceil = opt.rate;
+-+
+-+	/* compute minimal allowed burst from rate; mtu is added here to make
+-+	   sute that buffer is larger than mtu and to have some safeguard space */
+-+	if (!buffer) buffer = opt.rate.rate / HZ + mtu;
+-+	if (!cbuffer) cbuffer = opt.ceil.rate / HZ + mtu;
+-+
+-+	if ((cell_log = tc_calc_rtable(opt.rate.rate, rtab, cell_log, mtu, 0)) < 0) {
+-+		fprintf(stderr, "htb: failed to calculate rate table.\n");
+-+		return -1;
+-+	}
+-+	opt.buffer = tc_calc_xmittime(opt.rate.rate, buffer);
+-+	opt.rate.cell_log = cell_log;
+-+
+-+	if ((ccell_log = tc_calc_rtable(opt.ceil.rate, ctab, cell_log, mtu, 0)) < 0) {
+-+		fprintf(stderr, "htb: failed to calculate ceil rate table.\n");
+-+		return -1;
+-+	}
+-+	opt.cbuffer = tc_calc_xmittime(opt.ceil.rate, cbuffer);
+-+	opt.ceil.cell_log = ccell_log;
+-+
+-+	tail = (struct rtattr*)(((void*)n)+NLMSG_ALIGN(n->nlmsg_len));
+-+	addattr_l(n, 1024, TCA_OPTIONS, NULL, 0);
+-+	addattr_l(n, 2024, TCA_HTB_PARMS, &opt, sizeof(opt));
+-+	addattr_l(n, 3024, TCA_HTB_RTAB, rtab, 1024);
+-+	addattr_l(n, 4024, TCA_HTB_CTAB, ctab, 1024);
+-+	tail->rta_len = (((void*)n)+NLMSG_ALIGN(n->nlmsg_len)) - (void*)tail;
+-+	return 0;
+-+}
+-+
+-+static int htb_print_opt(struct qdisc_util *qu, FILE *f, struct rtattr *opt)
+-+{
+-+	struct rtattr *tb[TCA_HTB_RTAB+1];
+-+	struct tc_htb_opt *hopt;
+-+	struct tc_htb_glob *gopt;
+-+	double buffer,cbuffer;
+-+	SPRINT_BUF(b1);
+-+	SPRINT_BUF(b2);
+-+
+-+	if (opt == NULL)
+-+		return 0;
+-+
+-+	memset(tb, 0, sizeof(tb));
+-+	parse_rtattr(tb, TCA_HTB_RTAB, RTA_DATA(opt), RTA_PAYLOAD(opt));
+-+
+-+	if (tb[TCA_HTB_PARMS]) {
+-+
+-+	    hopt = RTA_DATA(tb[TCA_HTB_PARMS]);
+-+	    if (RTA_PAYLOAD(tb[TCA_HTB_PARMS])  < sizeof(*hopt)) return -1;
+-+
+-+		if (!hopt->level) {
+-+			fprintf(f, "prio %d ", (int)hopt->prio);
+-+			if (show_details)
+-+				fprintf(f, "quantum %d ", (int)hopt->quantum);
+-+		}
+-+	    fprintf(f, "rate %s ", sprint_rate(hopt->rate.rate, b1));
+-+	    buffer = ((double)hopt->rate.rate*tc_core_tick2usec(hopt->buffer))/1000000;
+-+	    fprintf(f, "ceil %s ", sprint_rate(hopt->ceil.rate, b1));
+-+	    cbuffer = ((double)hopt->ceil.rate*tc_core_tick2usec(hopt->cbuffer))/1000000;
+-+	    if (show_details) {
+-+		fprintf(f, "burst %s/%u mpu %s ", sprint_size(buffer, b1),
+-+			1<<hopt->rate.cell_log, sprint_size(hopt->rate.mpu, b2));
+-+		fprintf(f, "cburst %s/%u mpu %s ", sprint_size(cbuffer, b1),
+-+			1<<hopt->ceil.cell_log, sprint_size(hopt->ceil.mpu, b2));
+-+		fprintf(f, "level %d ", (int)hopt->level);
+-+	    } else {
+-+		fprintf(f, "burst %s ", sprint_size(buffer, b1));
+-+		fprintf(f, "cburst %s ", sprint_size(cbuffer, b1));
+-+	    }
+-+	    if (show_raw)
+-+		fprintf(f, "buffer [%08x] cbuffer [%08x] ",
+-+			hopt->buffer,hopt->cbuffer);
+-+	}
+-+	if (tb[TCA_HTB_INIT]) {
+-+	    gopt = RTA_DATA(tb[TCA_HTB_INIT]);
+-+	    if (RTA_PAYLOAD(tb[TCA_HTB_INIT])  < sizeof(*gopt)) return -1;
+-+
+-+	    fprintf(f, "r2q %d default %x direct_packets_stat %u",
+-+		    gopt->rate2quantum,gopt->defcls,gopt->direct_pkts);
+-+		if (show_details)
+-+			fprintf(f," ver %d.%d",gopt->version >> 16,gopt->version & 0xffff);
+-+	}
+-+	return 0;
+-+}
+-+
+-+static int htb_print_xstats(struct qdisc_util *qu, FILE *f, struct rtattr *xstats)
+-+{
+-+	struct tc_htb_xstats *st;
+-+	if (xstats == NULL)
+-+		return 0;
+-+
+-+	if (RTA_PAYLOAD(xstats) < sizeof(*st))
+-+		return -1;
+-+
+-+	st = RTA_DATA(xstats);
+-+	fprintf(f, " lended: %u borrowed: %u giants: %u\n",
+-+		st->lends,st->borrows,st->giants);
+-+	fprintf(f, " tokens: %d ctokens: %d\n", st->tokens,st->ctokens);
+-+	return 0;
+-+}
+-+
+-+struct qdisc_util htb_util = {
+-+	NULL,
+-+	"htb",
+-+	htb_parse_opt,
+-+	htb_print_opt,
+-+	htb_print_xstats,
+-+	htb_parse_class_opt,
+-+	htb_print_opt,
+-+};
+-+
+-+/* for testing of old one */
+-+struct qdisc_util htb2_util = {
+-+	NULL,
+-+	"htb2",
+-+	htb_parse_opt,
+-+	htb_print_opt,
+-+	htb_print_xstats,
+-+	htb_parse_class_opt,
+-+	htb_print_opt,
+-+};
+-+#endif
+- /*
+-  * q_htb.c		HTB.
+-  *
+---- /dev/null
+-+++ b/tc/q_wrr.c
+-@@ -0,0 +1,322 @@
+-+#include <stdio.h>
+-+#include <stdlib.h>
+-+#include <unistd.h>
+-+#include <syslog.h>
+-+#include <fcntl.h>
+-+#include <sys/socket.h>
+-+#include <netinet/in.h>
+-+#include <arpa/inet.h>
+-+#include <string.h>
+-+#include <math.h>
+-+
+-+#include "utils.h"
+-+#include "tc_util.h"
+-+
+-+#define usage() return(-1)
+-+
+-+// Returns -1 on error
+-+static int wrr_parse_qdisc_weight(int argc, char** argv,
+-+                              struct tc_wrr_qdisc_modf* opt) {
+-+  int i;
+-+
+-+  opt->weight1.weight_mode=-1;
+-+  opt->weight2.weight_mode=-1;
+-+
+-+  for(i=0; i<argc; i++) {
+-+    if(!memcmp(argv[i],"wmode1=",7)) {
+-+      opt->weight1.weight_mode=atoi(argv[i]+7);
+-+    } else if(!memcmp(argv[i],"wmode2=",7)) {
+-+      opt->weight2.weight_mode=atoi(argv[i]+7);
+-+    } else {
+-+      printf("Usage: ... [wmode1=0|1|2|3] [wmode2=0|1|2|3]\n");
+-+      return -1;
+-+    }
+-+  }
+-+  return 0;
+-+}
+-+
+-+static int wrr_parse_class_modf(int argc, char** argv,
+-+                                struct tc_wrr_class_modf* modf) {
+-+  int i;
+-+
+-+  if(argc<1) {
+-+    fprintf(stderr, "Usage: ... [weight1=val] [decr1=val] [incr1=val] [min1=val] [max1=val] [val2=val] ...\n");
+-+    fprintf(stderr, "  The values can be floating point like 0.42 or divisions like 42/100\n");
+-+    return -1;
+-+  }
+-+
+-+  // Set meaningless values:
+-+  modf->weight1.val=0;
+-+  modf->weight1.decr=(__u64)-1;
+-+  modf->weight1.incr=(__u64)-1;
+-+  modf->weight1.min=0;
+-+  modf->weight1.max=0;
+-+  modf->weight2.val=0;
+-+  modf->weight2.decr=(__u64)-1;
+-+  modf->weight2.incr=(__u64)-1;
+-+  modf->weight2.min=0;
+-+  modf->weight2.max=0;
+-+
+-+  // And read values:
+-+  for(i=0; i<argc; i++) {
+-+    char arg[80];
+-+    char* name,*value1=0,*value2=0;
+-+    long double f_val1,f_val2=1,value;
+-+    if(strlen(argv[i])>=sizeof(arg)) {
+-+      fprintf(stderr,"Argument too long: %s\n",argv[i]);
+-+      return -1;
+-+    }
+-+    strcpy(arg,argv[i]);
+-+
+-+    name=strtok(arg,"=");
+-+    if(name) value1=strtok(0,"/");
+-+    if(value1) value2=strtok(0,"");
+-+
+-+    if(!value1) {
+-+      fprintf(stderr,"No = found in argument: %s\n",argv[i]);
+-+      return -1;
+-+    }
+-+
+-+    f_val1=atof(value1);
+-+    if(value2) f_val2=atof(value2);
+-+
+-+    if(f_val2==0)  {
+-+      fprintf(stderr,"Division by 0\n");
+-+      return -1;
+-+    }
+-+
+-+    value=f_val1/f_val2;
+-+    if(value>1) value=1;
+-+    if(value<0) value=0;
+-+    value*=((__u64)-1);
+-+
+-+    // And find the value set
+-+    if(!strcmp(name,"weight1"))    modf->weight1.val=value;
+-+    else if(!strcmp(name,"decr1")) modf->weight1.decr=value;
+-+    else if(!strcmp(name,"incr1")) modf->weight1.incr=value;
+-+    else if(!strcmp(name,"min1"))  modf->weight1.min=value;
+-+    else if(!strcmp(name,"max1"))  modf->weight1.max=value;
+-+    else if(!strcmp(name,"weight2")) modf->weight2.val=value;
+-+    else if(!strcmp(name,"decr2")) modf->weight2.decr=value;
+-+    else if(!strcmp(name,"incr2")) modf->weight2.incr=value;
+-+    else if(!strcmp(name,"min2"))  modf->weight2.min=value;
+-+    else if(!strcmp(name,"max2"))  modf->weight2.max=value;
+-+    else {
+-+      fprintf(stderr,"illegal value: %s\n",name);
+-+      return -1;
+-+    }
+-+  }
+-+
+-+  return 0;
+-+}
+-+
+-+static int wrr_parse_opt(struct qdisc_util *qu, int argc, char **argv, struct nlmsghdr *n)
+-+{
+-+  if(n->nlmsg_flags & NLM_F_CREATE) {
+-+    // This is a create request:
+-+    struct tc_wrr_qdisc_crt opt;
+-+
+-+    int sour,dest,ip,mac,masq;
+-+
+-+    if(argc<4) {
+-+      fprintf(stderr, "Usage: ... wrr sour|dest ip|masq|mac maxclasses proxymaxcon [penalty-setup]\n");
+-+      return -1;
+-+    }
+-+
+-+    // Read sour/dest:
+-+    memset(&opt,0,sizeof(opt));
+-+    sour=!strcmp(argv[0],"sour");
+-+    dest=!strcmp(argv[0],"dest");
+-+
+-+    if(!sour && !dest) {
+-+      fprintf(stderr,"sour or dest must be specified\n");
+-+      return -1;
+-+    }
+-+
+-+    // Read ip/mac
+-+    ip=!strcmp(argv[1],"ip");
+-+    mac=!strcmp(argv[1],"mac");
+-+    masq=!strcmp(argv[1],"masq");
+-+
+-+    if(!ip && !mac && !masq) {
+-+      fprintf(stderr,"ip, masq or mac must be specified\n");
+-+      return -1;
+-+    }
+-+
+-+    opt.srcaddr=sour;
+-+    opt.usemac=mac;
+-+    opt.usemasq=masq;
+-+    opt.bands_max=atoi(argv[2]);
+-+
+-+    opt.proxy_maxconn=atoi(argv[3]);
+-+
+-+    // Read weights:
+-+    if(wrr_parse_qdisc_weight(argc-4,argv+4,&opt.qdisc_modf)<0) return -1;
+-+    if(opt.qdisc_modf.weight1.weight_mode==-1) opt.qdisc_modf.weight1.weight_mode=0;
+-+    if(opt.qdisc_modf.weight2.weight_mode==-1) opt.qdisc_modf.weight2.weight_mode=0;
+-+
+-+    addattr_l(n, 1024, TCA_OPTIONS, &opt, sizeof(opt));
+-+  } else {
+-+    struct tc_wrr_qdisc_modf_std opt;
+-+    char qdisc,class;
+-+
+-+    // This is a modify request:
+-+    if(argc<1) {
+-+      fprintf(stderr,"... qdisc ... or ... class ...\n");
+-+      return -1;
+-+    }
+-+
+-+    qdisc=!strcmp(argv[0],"qdisc");
+-+    class=!strcmp(argv[0],"class");
+-+
+-+    if(!qdisc && !class) {
+-+      fprintf(stderr,"qdisc or class must be specified\n");
+-+      return -1;
+-+    }
+-+
+-+    argc--;
+-+    argv++;
+-+
+-+    opt.proxy=0;
+-+
+-+    if(qdisc) {
+-+      opt.change_class=0;
+-+      if(wrr_parse_qdisc_weight(argc, argv, &opt.qdisc_modf)<0) return -1;
+-+    } else {
+-+      int a0,a1,a2,a3,a4=0,a5=0;
+-+
+-+      opt.change_class=1;
+-+
+-+      if(argc<1) {
+-+        fprintf(stderr,"... <mac>|<ip>|<masq> ...\n");
+-+        return -1;
+-+      }
+-+      memset(opt.addr,0,sizeof(opt.addr));
+-+
+-+      if((sscanf(argv[0],"%i.%i.%i.%i",&a0,&a1,&a2,&a3)!=4) &&
+-+         (sscanf(argv[0],"%x:%x:%x:%x:%x:%x",&a0,&a1,&a2,&a3,&a4,&a5)!=6)) {
+-+	fprintf(stderr,"Wrong format of mac or ip address\n");
+-+	return -1;
+-+      }
+-+
+-+      opt.addr[0]=a0; opt.addr[1]=a1; opt.addr[2]=a2;
+-+      opt.addr[3]=a3; opt.addr[4]=a4; opt.addr[5]=a5;
+-+
+-+      if(wrr_parse_class_modf(argc-1, argv+1, &opt.class_modf)<0) return -1;
+-+    }
+-+
+-+    addattr_l(n, 1024, TCA_OPTIONS, &opt, sizeof(opt));
+-+  }
+-+  return 0;
+-+}
+-+
+-+static int wrr_parse_copt(struct qdisc_util *qu, int argc, char **argv, struct nlmsghdr *n) {
+-+  struct tc_wrr_class_modf opt;
+-+
+-+  memset(&opt,0,sizeof(opt));
+-+  if(wrr_parse_class_modf(argc,argv,&opt)<0) return -1;
+-+
+-+  addattr_l(n, 1024, TCA_OPTIONS, &opt, sizeof(opt));
+-+  return 0;
+-+}
+-+
+-+static int wrr_print_opt(struct qdisc_util *qu, FILE *f, struct rtattr *opt)
+-+{
+-+	struct tc_wrr_qdisc_stats *qopt;
+-+
+-+	if (opt == NULL)
+-+		return 0;
+-+
+-+	if (RTA_PAYLOAD(opt)  < sizeof(*qopt))
+-+		return -1;
+-+	qopt = RTA_DATA(opt);
+-+
+-+	fprintf(f,"\n  (%s/%s) (maxclasses %i) (usedclasses %i) (reused classes %i)\n",
+-+	  qopt->qdisc_crt.srcaddr ? "sour" : "dest",
+-+	  qopt->qdisc_crt.usemac  ? "mac"  : (qopt->qdisc_crt.usemasq ? "masq" : "ip"),
+-+	  qopt->qdisc_crt.bands_max,
+-+	  qopt->bands_cur,
+-+	  qopt->bands_reused
+-+	  );
+-+
+-+	if(qopt->qdisc_crt.proxy_maxconn) {
+-+	  fprintf(f,"  (proxy maxcon %i) (proxy curcon %i)\n",
+-+	    qopt->qdisc_crt.proxy_maxconn,qopt->proxy_curconn);
+-+	}
+-+
+-+	fprintf(f,"  (waiting classes %i) (packets requeued %i) (priosum: %Lg)\n",
+-+	  qopt->nodes_in_heap,
+-+	  qopt->packets_requed,
+-+	  qopt->priosum/((long double)((__u32)-1))
+-+	  );
+-+
+-+	fprintf(f,"  (wmode1 %i) (wmode2 %i) \n",
+-+	  qopt->qdisc_crt.qdisc_modf.weight1.weight_mode,
+-+	  qopt->qdisc_crt.qdisc_modf.weight2.weight_mode);
+-+
+-+	return 0;
+-+}
+-+
+-+static int wrr_print_copt(struct qdisc_util *qu, FILE *f, struct rtattr *opt) {
+-+  struct tc_wrr_class_stats *copt;
+-+  long double d=(__u64)-1;
+-+
+-+  if (opt == NULL) return 0;
+-+
+-+  if (RTA_PAYLOAD(opt)  < sizeof(*copt))
+-+    return -1;
+-+  copt = RTA_DATA(opt);
+-+
+-+  if(!copt->used) {
+-+    fprintf(f,"(unused)");
+-+    return 0;
+-+  }
+-+
+-+  if(copt->usemac) {
+-+    fprintf(f,"\n  (address: %.2X:%.2X:%.2X:%.2X:%.2X:%.2X)\n",
+-+      copt->addr[0],copt->addr[1],copt->addr[2],
+-+      copt->addr[3],copt->addr[4],copt->addr[5]);
+-+  } else {
+-+    fprintf(f,"\n  (address: %i.%i.%i.%i)\n",copt->addr[0],copt->addr[1],copt->addr[2],copt->addr[3]);
+-+  }
+-+
+-+  fprintf(f,"  (total weight: %Lg) (current position: %i) (counters: %u %u : %u %u)\n",
+-+    (copt->class_modf.weight1.val/d)*(copt->class_modf.weight2.val/d),
+-+    copt->heappos,
+-+    (unsigned)(copt->penal_ms>>32),
+-+    (unsigned)(copt->penal_ms & 0xffffffffU),
+-+    (unsigned)(copt->penal_ls>>32),
+-+    (unsigned)(copt->penal_ls & 0xffffffffU)
+-+    );
+-+
+-+  fprintf(f,"  Pars 1: (weight %Lg) (decr: %Lg) (incr: %Lg) (min: %Lg) (max: %Lg)\n",
+-+    copt->class_modf.weight1.val/d,
+-+    copt->class_modf.weight1.decr/d,
+-+    copt->class_modf.weight1.incr/d,
+-+    copt->class_modf.weight1.min/d,
+-+    copt->class_modf.weight1.max/d);
+-+
+-+  fprintf(f,"  Pars 2: (weight %Lg) (decr: %Lg) (incr: %Lg) (min: %Lg) (max: %Lg)",
+-+    copt->class_modf.weight2.val/d,
+-+    copt->class_modf.weight2.decr/d,
+-+    copt->class_modf.weight2.incr/d,
+-+    copt->class_modf.weight2.min/d,
+-+    copt->class_modf.weight2.max/d);
+-+
+-+  return 0;
+-+}
+-+
+-+static int wrr_print_xstats(struct qdisc_util *qu, FILE *f, struct rtattr *xstats)
+-+{
+-+	return 0;
+-+}
+-+
+-+
+-+struct qdisc_util wrr_qdisc_util = {
+-+	.id = "wrr",
+-+	.parse_qopt = wrr_parse_opt,
+-+	.print_qopt = wrr_print_opt,
+-+	.print_xstats = wrr_print_xstats,
+-+	.parse_copt = wrr_parse_copt,
+-+	.print_copt = wrr_print_copt
+-+};
+diff --git a/package/iproute2/patches/001-iproute2-2.6.11_Config.patch b/package/iproute2/patches/001-iproute2-2.6.11_Config.patch
+deleted file mode 100644
+index ece8652..0000000
+--- a/package/iproute2/patches/001-iproute2-2.6.11_Config.patch
++++ /dev/null
+@@ -1,7 +0,0 @@
+---- /dev/null
+-+++ b/Config
+-@@ -0,0 +1,4 @@
+-+# Fixed config to disable ATM support even if present on host system
+-+TC_CONFIG_ATM:=n
+-+TC_CONFIG_ACTION_GACT=y
+-+TC_CONFIG_ACTION_PROB=y
+diff --git a/package/iproute2/patches/002-iproute2-ipxfrm_no_sctp.patch b/package/iproute2/patches/002-iproute2-ipxfrm_no_sctp.patch
+deleted file mode 100644
+index cf2c9e9..0000000
+--- a/package/iproute2/patches/002-iproute2-ipxfrm_no_sctp.patch
++++ /dev/null
+@@ -1,22 +0,0 @@
+----
+- ip/ipxfrm.c |    2 --
+- 1 file changed, 2 deletions(-)
+-
+---- a/ip/ipxfrm.c
+-+++ b/ip/ipxfrm.c
+-@@ -467,7 +467,6 @@ void xfrm_selector_print(struct xfrm_sel
+- 	switch (sel->proto) {
+- 	case IPPROTO_TCP:
+- 	case IPPROTO_UDP:
+--	case IPPROTO_SCTP:
+- 	case IPPROTO_DCCP:
+- 	default: /* XXX */
+- 		if (sel->sport_mask)
+-@@ -1172,7 +1171,6 @@ static int xfrm_selector_upspec_parse(st
+- 		switch (sel->proto) {
+- 		case IPPROTO_TCP:
+- 		case IPPROTO_UDP:
+--		case IPPROTO_SCTP:
+- 		case IPPROTO_DCCP:
+- 			break;
+- 		default:
+diff --git a/package/iproute2/patches/003-iproute2-get_dont_filter_cached.patch b/package/iproute2/patches/003-iproute2-get_dont_filter_cached.patch
+deleted file mode 100644
+index 35c1ac4..0000000
+--- a/package/iproute2/patches/003-iproute2-get_dont_filter_cached.patch
++++ /dev/null
+@@ -1,10 +0,0 @@
+---- a/ip/iproute.c
+-+++ b/ip/iproute.c
+-@@ -1286,6 +1286,7 @@ int iproute_get(int argc, char **argv)
+- 	memset(&req, 0, sizeof(req));
+- 
+- 	iproute_reset_filter();
+-+	filter.cloned = 2;
+- 
+- 	req.n.nlmsg_len = NLMSG_LENGTH(sizeof(struct rtmsg));
+- 	req.n.nlmsg_flags = NLM_F_REQUEST;
+diff --git a/package/iproute2/patches/005-flex-generated.patch b/package/iproute2/patches/005-flex-generated.patch
+deleted file mode 100644
+index 34c9800..0000000
+--- a/package/iproute2/patches/005-flex-generated.patch
++++ /dev/null
+@@ -1,1767 +0,0 @@
+---- /dev/null
+-+++ b/tc/emp_ematch.lex.c
+-@@ -0,0 +1,1764 @@
+-+#define yy_create_buffer ematch__create_buffer
+-+#define yy_delete_buffer ematch__delete_buffer
+-+#define yy_scan_buffer ematch__scan_buffer
+-+#define yy_scan_string ematch__scan_string
+-+#define yy_scan_bytes ematch__scan_bytes
+-+#define yy_flex_debug ematch__flex_debug
+-+#define yy_init_buffer ematch__init_buffer
+-+#define yy_flush_buffer ematch__flush_buffer
+-+#define yy_load_buffer_state ematch__load_buffer_state
+-+#define yy_switch_to_buffer ematch__switch_to_buffer
+-+#define yyin ematch_in
+-+#define yyleng ematch_leng
+-+#define yylex ematch_lex
+-+#define yyout ematch_out
+-+#define yyrestart ematch_restart
+-+#define yytext ematch_text
+-+
+-+#line 19 "enp_ematch.lex.c"
+-+/* A lexical scanner generated by flex */
+-+
+-+/* Scanner skeleton version:
+-+ * $Header: /home/daffy/u0/vern/flex/RCS/flex.skl,v 2.91 96/09/10 16:58:48 vern Exp $
+-+ */
+-+
+-+#define FLEX_SCANNER
+-+#define YY_FLEX_MAJOR_VERSION 2
+-+#define YY_FLEX_MINOR_VERSION 5
+-+
+-+#include <stdio.h>
+-+
+-+
+-+/* cfront 1.2 defines "c_plusplus" instead of "__cplusplus" */
+-+#ifdef c_plusplus
+-+#ifndef __cplusplus
+-+#define __cplusplus
+-+#endif
+-+#endif
+-+
+-+
+-+#ifdef __cplusplus
+-+
+-+#include <stdlib.h>
+-+#include <unistd.h>
+-+
+-+/* Use prototypes in function declarations. */
+-+#define YY_USE_PROTOS
+-+
+-+/* The "const" storage-class-modifier is valid. */
+-+#define YY_USE_CONST
+-+
+-+#else	/* ! __cplusplus */
+-+
+-+#if __STDC__
+-+
+-+#define YY_USE_PROTOS
+-+#define YY_USE_CONST
+-+
+-+#endif	/* __STDC__ */
+-+#endif	/* ! __cplusplus */
+-+
+-+#ifdef __TURBOC__
+-+ #pragma warn -rch
+-+ #pragma warn -use
+-+#include <io.h>
+-+#include <stdlib.h>
+-+#define YY_USE_CONST
+-+#define YY_USE_PROTOS
+-+#endif
+-+
+-+#ifdef YY_USE_CONST
+-+#define yyconst const
+-+#else
+-+#define yyconst
+-+#endif
+-+
+-+
+-+#ifdef YY_USE_PROTOS
+-+#define YY_PROTO(proto) proto
+-+#else
+-+#define YY_PROTO(proto) ()
+-+#endif
+-+
+-+/* Returned upon end-of-file. */
+-+#define YY_NULL 0
+-+
+-+/* Promotes a possibly negative, possibly signed char to an unsigned
+-+ * integer for use as an array index.  If the signed char is negative,
+-+ * we want to instead treat it as an 8-bit unsigned char, hence the
+-+ * double cast.
+-+ */
+-+#define YY_SC_TO_UI(c) ((unsigned int) (unsigned char) c)
+-+
+-+/* Enter a start condition.  This macro really ought to take a parameter,
+-+ * but we do it the disgusting crufty way forced on us by the ()-less
+-+ * definition of BEGIN.
+-+ */
+-+#define BEGIN yy_start = 1 + 2 *
+-+
+-+/* Translate the current start state into a value that can be later handed
+-+ * to BEGIN to return to the state.  The YYSTATE alias is for lex
+-+ * compatibility.
+-+ */
+-+#define YY_START ((yy_start - 1) / 2)
+-+#define YYSTATE YY_START
+-+
+-+/* Action number for EOF rule of a given start state. */
+-+#define YY_STATE_EOF(state) (YY_END_OF_BUFFER + state + 1)
+-+
+-+/* Special action meaning "start processing a new file". */
+-+#define YY_NEW_FILE yyrestart( yyin )
+-+
+-+#define YY_END_OF_BUFFER_CHAR 0
+-+
+-+/* Size of default input buffer. */
+-+#define YY_BUF_SIZE 16384
+-+
+-+typedef struct yy_buffer_state *YY_BUFFER_STATE;
+-+
+-+extern int yyleng;
+-+extern FILE *yyin, *yyout;
+-+
+-+#define EOB_ACT_CONTINUE_SCAN 0
+-+#define EOB_ACT_END_OF_FILE 1
+-+#define EOB_ACT_LAST_MATCH 2
+-+
+-+/* The funky do-while in the following #define is used to turn the definition
+-+ * int a single C statement (which needs a semi-colon terminator).  This
+-+ * avoids problems with code like:
+-+ *
+-+ * 	if ( condition_holds )
+-+ *		yyless( 5 );
+-+ *	else
+-+ *		do_something_else();
+-+ *
+-+ * Prior to using the do-while the compiler would get upset at the
+-+ * "else" because it interpreted the "if" statement as being all
+-+ * done when it reached the ';' after the yyless() call.
+-+ */
+-+
+-+/* Return all but the first 'n' matched characters back to the input stream. */
+-+
+-+#define yyless(n) \
+-+	do \
+-+		{ \
+-+		/* Undo effects of setting up yytext. */ \
+-+		*yy_cp = yy_hold_char; \
+-+		YY_RESTORE_YY_MORE_OFFSET \
+-+		yy_c_buf_p = yy_cp = yy_bp + n - YY_MORE_ADJ; \
+-+		YY_DO_BEFORE_ACTION; /* set up yytext again */ \
+-+		} \
+-+	while ( 0 )
+-+
+-+#define unput(c) yyunput( c, yytext_ptr )
+-+
+-+/* The following is because we cannot portably get our hands on size_t
+-+ * (without autoconf's help, which isn't available because we want
+-+ * flex-generated scanners to compile on their own).
+-+ */
+-+typedef unsigned int yy_size_t;
+-+
+-+
+-+struct yy_buffer_state
+-+	{
+-+	FILE *yy_input_file;
+-+
+-+	char *yy_ch_buf;		/* input buffer */
+-+	char *yy_buf_pos;		/* current position in input buffer */
+-+
+-+	/* Size of input buffer in bytes, not including room for EOB
+-+	 * characters.
+-+	 */
+-+	yy_size_t yy_buf_size;
+-+
+-+	/* Number of characters read into yy_ch_buf, not including EOB
+-+	 * characters.
+-+	 */
+-+	int yy_n_chars;
+-+
+-+	/* Whether we "own" the buffer - i.e., we know we created it,
+-+	 * and can realloc() it to grow it, and should free() it to
+-+	 * delete it.
+-+	 */
+-+	int yy_is_our_buffer;
+-+
+-+	/* Whether this is an "interactive" input source; if so, and
+-+	 * if we're using stdio for input, then we want to use getc()
+-+	 * instead of fread(), to make sure we stop fetching input after
+-+	 * each newline.
+-+	 */
+-+	int yy_is_interactive;
+-+
+-+	/* Whether we're considered to be at the beginning of a line.
+-+	 * If so, '^' rules will be active on the next match, otherwise
+-+	 * not.
+-+	 */
+-+	int yy_at_bol;
+-+
+-+	/* Whether to try to fill the input buffer when we reach the
+-+	 * end of it.
+-+	 */
+-+	int yy_fill_buffer;
+-+
+-+	int yy_buffer_status;
+-+#define YY_BUFFER_NEW 0
+-+#define YY_BUFFER_NORMAL 1
+-+	/* When an EOF's been seen but there's still some text to process
+-+	 * then we mark the buffer as YY_EOF_PENDING, to indicate that we
+-+	 * shouldn't try reading from the input source any more.  We might
+-+	 * still have a bunch of tokens to match, though, because of
+-+	 * possible backing-up.
+-+	 *
+-+	 * When we actually see the EOF, we change the status to "new"
+-+	 * (via yyrestart()), so that the user can continue scanning by
+-+	 * just pointing yyin at a new input file.
+-+	 */
+-+#define YY_BUFFER_EOF_PENDING 2
+-+	};
+-+
+-+static YY_BUFFER_STATE yy_current_buffer = 0;
+-+
+-+/* We provide macros for accessing buffer states in case in the
+-+ * future we want to put the buffer states in a more general
+-+ * "scanner state".
+-+ */
+-+#define YY_CURRENT_BUFFER yy_current_buffer
+-+
+-+
+-+/* yy_hold_char holds the character lost when yytext is formed. */
+-+static char yy_hold_char;
+-+
+-+static int yy_n_chars;		/* number of characters read into yy_ch_buf */
+-+
+-+
+-+int yyleng;
+-+
+-+/* Points to current character in buffer. */
+-+static char *yy_c_buf_p = (char *) 0;
+-+static int yy_init = 1;		/* whether we need to initialize */
+-+static int yy_start = 0;	/* start state number */
+-+
+-+/* Flag which is used to allow yywrap()'s to do buffer switches
+-+ * instead of setting up a fresh yyin.  A bit of a hack ...
+-+ */
+-+static int yy_did_buffer_switch_on_eof;
+-+
+-+void yyrestart YY_PROTO(( FILE *input_file ));
+-+
+-+void yy_switch_to_buffer YY_PROTO(( YY_BUFFER_STATE new_buffer ));
+-+void yy_load_buffer_state YY_PROTO(( void ));
+-+YY_BUFFER_STATE yy_create_buffer YY_PROTO(( FILE *file, int size ));
+-+void yy_delete_buffer YY_PROTO(( YY_BUFFER_STATE b ));
+-+void yy_init_buffer YY_PROTO(( YY_BUFFER_STATE b, FILE *file ));
+-+void yy_flush_buffer YY_PROTO(( YY_BUFFER_STATE b ));
+-+#define YY_FLUSH_BUFFER yy_flush_buffer( yy_current_buffer )
+-+
+-+YY_BUFFER_STATE yy_scan_buffer YY_PROTO(( char *base, yy_size_t size ));
+-+YY_BUFFER_STATE yy_scan_string YY_PROTO(( yyconst char *yy_str ));
+-+YY_BUFFER_STATE yy_scan_bytes YY_PROTO(( yyconst char *bytes, int len ));
+-+
+-+static void *yy_flex_alloc YY_PROTO(( yy_size_t ));
+-+static void *yy_flex_realloc YY_PROTO(( void *, yy_size_t ));
+-+static void yy_flex_free YY_PROTO(( void * ));
+-+
+-+#define yy_new_buffer yy_create_buffer
+-+
+-+#define yy_set_interactive(is_interactive) \
+-+	{ \
+-+	if ( ! yy_current_buffer ) \
+-+		yy_current_buffer = yy_create_buffer( yyin, YY_BUF_SIZE ); \
+-+	yy_current_buffer->yy_is_interactive = is_interactive; \
+-+	}
+-+
+-+#define yy_set_bol(at_bol) \
+-+	{ \
+-+	if ( ! yy_current_buffer ) \
+-+		yy_current_buffer = yy_create_buffer( yyin, YY_BUF_SIZE ); \
+-+	yy_current_buffer->yy_at_bol = at_bol; \
+-+	}
+-+
+-+#define YY_AT_BOL() (yy_current_buffer->yy_at_bol)
+-+
+-+
+-+#define yywrap() 1
+-+#define YY_SKIP_YYWRAP
+-+typedef unsigned char YY_CHAR;
+-+FILE *yyin = (FILE *) 0, *yyout = (FILE *) 0;
+-+typedef int yy_state_type;
+-+extern char *yytext;
+-+#define yytext_ptr yytext
+-+
+-+static yy_state_type yy_get_previous_state YY_PROTO(( void ));
+-+static yy_state_type yy_try_NUL_trans YY_PROTO(( yy_state_type current_state ));
+-+static int yy_get_next_buffer YY_PROTO(( void ));
+-+static void yy_fatal_error YY_PROTO(( yyconst char msg[] ));
+-+
+-+/* Done after the current pattern has been matched and before the
+-+ * corresponding action - sets up yytext.
+-+ */
+-+#define YY_DO_BEFORE_ACTION \
+-+	yytext_ptr = yy_bp; \
+-+	yyleng = (int) (yy_cp - yy_bp); \
+-+	yy_hold_char = *yy_cp; \
+-+	*yy_cp = '\0'; \
+-+	yy_c_buf_p = yy_cp;
+-+
+-+#define YY_NUM_RULES 22
+-+#define YY_END_OF_BUFFER 23
+-+static yyconst short int yy_accept[43] =
+-+    {   0,
+-+        0,    0,    0,    0,   23,   21,    1,    2,   19,   20,
+-+       21,   21,   21,   15,   22,    3,   22,   21,    1,   21,
+-+       21,   17,   15,   14,    4,    5,   13,   11,   12,    7,
+-+        8,    9,   10,   14,   16,   18,    4,    5,    6,    4,
+-+        6,    0
+-+    } ;
+-+
+-+static yyconst int yy_ec[256] =
+-+    {   0,
+-+        1,    1,    1,    1,    1,    1,    1,    1,    2,    3,
+-+        1,    1,    2,    1,    1,    1,    1,    1,    1,    1,
+-+        1,    1,    1,    1,    1,    1,    1,    1,    1,    1,
+-+        1,    2,    1,    4,    1,    1,    1,    1,    1,    5,
+-+        6,    1,    1,    1,    1,    1,    1,    7,    7,    7,
+-+        7,    7,    7,    7,    7,    8,    8,    1,    1,    1,
+-+        1,    1,    1,    1,    9,   10,   10,   11,   10,   10,
+-+        1,    1,    1,    1,    1,    1,    1,   12,   13,    1,
+-+        1,   14,    1,   15,    1,    1,    1,    1,    1,    1,
+-+        1,   16,    1,    1,    1,    1,   17,   18,   10,   11,
+-+
+-+       10,   19,    1,    1,    1,    1,    1,    1,    1,   20,
+-+       13,    1,    1,   21,    1,   22,    1,   23,    1,   24,
+-+        1,    1,    1,    1,    1,    1,    1,    1,    1,    1,
+-+        1,    1,    1,    1,    1,    1,    1,    1,    1,    1,
+-+        1,    1,    1,    1,    1,    1,    1,    1,    1,    1,
+-+        1,    1,    1,    1,    1,    1,    1,    1,    1,    1,
+-+        1,    1,    1,    1,    1,    1,    1,    1,    1,    1,
+-+        1,    1,    1,    1,    1,    1,    1,    1,    1,    1,
+-+        1,    1,    1,    1,    1,    1,    1,    1,    1,    1,
+-+        1,    1,    1,    1,    1,    1,    1,    1,    1,    1,
+-+
+-+        1,    1,    1,    1,    1,    1,    1,    1,    1,    1,
+-+        1,    1,    1,    1,    1,    1,    1,    1,    1,    1,
+-+        1,    1,    1,    1,    1,    1,    1,    1,    1,    1,
+-+        1,    1,    1,    1,    1,    1,    1,    1,    1,    1,
+-+        1,    1,    1,    1,    1,    1,    1,    1,    1,    1,
+-+        1,    1,    1,    1,    1
+-+    } ;
+-+
+-+static yyconst int yy_meta[25] =
+-+    {   0,
+-+        1,    2,    3,    4,    2,    2,    5,    5,    5,    5,
+-+        5,    1,    1,    1,    1,    4,    5,    5,    5,    1,
+-+        1,    1,    1,    1
+-+    } ;
+-+
+-+static yyconst short int yy_base[48] =
+-+    {   0,
+-+        0,    0,   22,   24,   89,    0,   27,    0,   91,   91,
+-+       19,   75,   20,    0,   91,   91,   41,    0,   30,   72,
+-+       51,    0,    0,   91,   28,   60,   91,   91,   91,   91,
+-+       91,   91,   91,    0,    0,    0,   62,   64,    0,   67,
+-+       91,   91,   75,   80,   85,   77,   32
+-+    } ;
+-+
+-+static yyconst short int yy_def[48] =
+-+    {   0,
+-+       42,    1,   43,   43,   42,   44,   42,   44,   42,   42,
+-+       44,   44,   44,   45,   42,   42,   42,   44,   42,   44,
+-+       44,   44,   45,   42,   42,   42,   42,   42,   42,   42,
+-+       42,   42,   42,   46,   44,   44,   42,   42,   47,   42,
+-+       42,    0,   42,   42,   42,   42,   42
+-+    } ;
+-+
+-+static yyconst short int yy_nxt[116] =
+-+    {   0,
+-+        6,    7,    7,    8,    9,   10,    6,    6,   11,    6,
+-+        6,   12,   13,    6,    6,    6,   11,    6,    6,   12,
+-+        6,    6,    6,    6,   15,   16,   15,   16,   19,   19,
+-+       20,   19,   19,   22,   37,   38,   41,   17,   20,   17,
+-+       22,   24,   24,   24,   24,   24,   24,   25,   26,   24,
+-+       24,   24,   24,   24,   24,   24,   24,   27,   28,   29,
+-+       30,   31,   32,   33,   34,   36,   38,   38,   40,   38,
+-+       38,   38,   36,   38,   38,   14,   14,   14,   14,   14,
+-+       18,   39,   35,   18,   18,   23,   23,   21,   42,   23,
+-+        5,   42,   42,   42,   42,   42,   42,   42,   42,   42,
+-+
+-+       42,   42,   42,   42,   42,   42,   42,   42,   42,   42,
+-+       42,   42,   42,   42,   42
+-+    } ;
+-+
+-+static yyconst short int yy_chk[116] =
+-+    {   0,
+-+        1,    1,    1,    1,    1,    1,    1,    1,    1,    1,
+-+        1,    1,    1,    1,    1,    1,    1,    1,    1,    1,
+-+        1,    1,    1,    1,    3,    3,    4,    4,    7,    7,
+-+       11,   19,   19,   13,   25,   25,   47,    3,   11,    4,
+-+       13,   17,   17,   17,   17,   17,   17,   17,   17,   17,
+-+       17,   17,   17,   17,   17,   17,   17,   17,   17,   17,
+-+       17,   17,   17,   17,   17,   21,   26,   26,   37,   37,
+-+       38,   38,   21,   40,   40,   43,   43,   43,   43,   43,
+-+       44,   46,   20,   44,   44,   45,   45,   12,    5,   45,
+-+       42,   42,   42,   42,   42,   42,   42,   42,   42,   42,
+-+
+-+       42,   42,   42,   42,   42,   42,   42,   42,   42,   42,
+-+       42,   42,   42,   42,   42
+-+    } ;
+-+
+-+static yy_state_type yy_last_accepting_state;
+-+static char *yy_last_accepting_cpos;
+-+
+-+/* The intent behind this definition is that it'll catch
+-+ * any uses of REJECT which flex missed.
+-+ */
+-+#define REJECT reject_used_but_not_detected
+-+#define yymore() yymore_used_but_not_detected
+-+#define YY_MORE_ADJ 0
+-+#define YY_RESTORE_YY_MORE_OFFSET
+-+char *yytext;
+-+#line 1 "emp_ematch.l"
+-+#define INITIAL 0
+-+#line 2 "emp_ematch.l"
+-+ #include "emp_ematch.yacc.h"
+-+ #include "m_ematch.h"
+-+
+-+ extern int ematch_argc;
+-+ extern char **ematch_argv;
+-+
+-+ #define yylval ematch_lval
+-+
+-+ #define NEXT_EM_ARG() do { ematch_argc--; ematch_argv++; } while(0);
+-+
+-+ #define YY_INPUT(buf, result, max_size)				\
+-+ {									\
+-+ next:									\
+-+ 	if (ematch_argc <= 0)						\
+-+		result = YY_NULL;					\
+-+	else if (**ematch_argv == '\0') {				\
+-+		NEXT_EM_ARG();						\
+-+		goto next;						\
+-+	} else {							\
+-+		if (max_size <= strlen(*ematch_argv) + 1) {		\
+-+			fprintf(stderr, "match argument too long.\n");	\
+-+			result = YY_NULL;				\
+-+		} else {						\
+-+			strcpy(buf, *ematch_argv);			\
+-+			result = strlen(*ematch_argv) + 1;		\
+-+			buf[result-1] = ' ';				\
+-+			buf[result] = '\0';				\
+-+			NEXT_EM_ARG();					\
+-+		}							\
+-+	}								\
+-+ }
+-+
+-+ static void __attribute__ ((unused)) yyunput (int c,char *buf_ptr  );
+-+ static void __attribute__ ((unused)) yy_push_state (int  new_state );
+-+ static void __attribute__ ((unused)) yy_pop_state  (void);
+-+ static int  __attribute__ ((unused)) yy_top_state (void );
+-+
+-+ static char *strbuf;
+-+ static unsigned int strbuf_size;
+-+ static unsigned int strbuf_index;
+-+
+-+ static void strbuf_enlarge(void)
+-+ {
+-+ 	strbuf_size += 512;
+-+ 	strbuf = realloc(strbuf, strbuf_size);
+-+ }
+-+
+-+ static void strbuf_append_char(char c)
+-+ {
+-+ 	while (strbuf_index >= strbuf_size)
+-+ 		strbuf_enlarge();
+-+ 	strbuf[strbuf_index++] = c;
+-+ }
+-+
+-+ static void strbuf_append_charp(char *s)
+-+ {
+-+ 	while (strbuf_index >= strbuf_size)
+-+ 		strbuf_enlarge();
+-+ 	memcpy(strbuf + strbuf_index, s, strlen(s));
+-+ 	strbuf_index += strlen(s);
+-+ }
+-+
+-+#define str 1
+-+
+-+#define YY_STACK_USED 1
+-+#line 488 "enp_ematch.lex.c"
+-+
+-+/* Macros after this point can all be overridden by user definitions in
+-+ * section 1.
+-+ */
+-+
+-+#ifndef YY_SKIP_YYWRAP
+-+#ifdef __cplusplus
+-+extern "C" int yywrap YY_PROTO(( void ));
+-+#else
+-+extern int yywrap YY_PROTO(( void ));
+-+#endif
+-+#endif
+-+
+-+#ifndef YY_NO_UNPUT
+-+static void yyunput YY_PROTO(( int c, char *buf_ptr ));
+-+#endif
+-+
+-+#ifndef yytext_ptr
+-+static void yy_flex_strncpy YY_PROTO(( char *, yyconst char *, int ));
+-+#endif
+-+
+-+#ifdef YY_NEED_STRLEN
+-+static int yy_flex_strlen YY_PROTO(( yyconst char * ));
+-+#endif
+-+
+-+#ifndef YY_NO_INPUT
+-+#ifdef __cplusplus
+-+static int yyinput YY_PROTO(( void ));
+-+#else
+-+static int input YY_PROTO(( void ));
+-+#endif
+-+#endif
+-+
+-+#if YY_STACK_USED
+-+static int yy_start_stack_ptr = 0;
+-+static int yy_start_stack_depth = 0;
+-+static int *yy_start_stack = 0;
+-+#ifndef YY_NO_PUSH_STATE
+-+static void yy_push_state YY_PROTO(( int new_state ));
+-+#endif
+-+#ifndef YY_NO_POP_STATE
+-+static void yy_pop_state YY_PROTO(( void ));
+-+#endif
+-+#ifndef YY_NO_TOP_STATE
+-+static int yy_top_state YY_PROTO(( void ));
+-+#endif
+-+
+-+#else
+-+#define YY_NO_PUSH_STATE 1
+-+#define YY_NO_POP_STATE 1
+-+#define YY_NO_TOP_STATE 1
+-+#endif
+-+
+-+#ifdef YY_MALLOC_DECL
+-+YY_MALLOC_DECL
+-+#else
+-+#if __STDC__
+-+#ifndef __cplusplus
+-+#include <stdlib.h>
+-+#endif
+-+#else
+-+/* Just try to get by without declaring the routines.  This will fail
+-+ * miserably on non-ANSI systems for which sizeof(size_t) != sizeof(int)
+-+ * or sizeof(void*) != sizeof(int).
+-+ */
+-+#endif
+-+#endif
+-+
+-+/* Amount of stuff to slurp up with each read. */
+-+#ifndef YY_READ_BUF_SIZE
+-+#define YY_READ_BUF_SIZE 8192
+-+#endif
+-+
+-+/* Copy whatever the last rule matched to the standard output. */
+-+
+-+#ifndef ECHO
+-+/* This used to be an fputs(), but since the string might contain NUL's,
+-+ * we now use fwrite().
+-+ */
+-+#define ECHO (void) fwrite( yytext, yyleng, 1, yyout )
+-+#endif
+-+
+-+/* Gets input and stuffs it into "buf".  number of characters read, or YY_NULL,
+-+ * is returned in "result".
+-+ */
+-+#ifndef YY_INPUT
+-+#define YY_INPUT(buf,result,max_size) \
+-+	if ( yy_current_buffer->yy_is_interactive ) \
+-+		{ \
+-+		int c = '*', n; \
+-+		for ( n = 0; n < max_size && \
+-+			     (c = getc( yyin )) != EOF && c != '\n'; ++n ) \
+-+			buf[n] = (char) c; \
+-+		if ( c == '\n' ) \
+-+			buf[n++] = (char) c; \
+-+		if ( c == EOF && ferror( yyin ) ) \
+-+			YY_FATAL_ERROR( "input in flex scanner failed" ); \
+-+		result = n; \
+-+		} \
+-+	else if ( ((result = fread( buf, 1, max_size, yyin )) == 0) \
+-+		  && ferror( yyin ) ) \
+-+		YY_FATAL_ERROR( "input in flex scanner failed" );
+-+#endif
+-+
+-+/* No semi-colon after return; correct usage is to write "yyterminate();" -
+-+ * we don't want an extra ';' after the "return" because that will cause
+-+ * some compilers to complain about unreachable statements.
+-+ */
+-+#ifndef yyterminate
+-+#define yyterminate() return YY_NULL
+-+#endif
+-+
+-+/* Number of entries by which start-condition stack grows. */
+-+#ifndef YY_START_STACK_INCR
+-+#define YY_START_STACK_INCR 25
+-+#endif
+-+
+-+/* Report a fatal error. */
+-+#ifndef YY_FATAL_ERROR
+-+#define YY_FATAL_ERROR(msg) yy_fatal_error( msg )
+-+#endif
+-+
+-+/* Default declaration of generated scanner - a define so the user can
+-+ * easily add parameters.
+-+ */
+-+#ifndef YY_DECL
+-+#define YY_DECL int yylex YY_PROTO(( void ))
+-+#endif
+-+
+-+/* Code executed at the beginning of each rule, after yytext and yyleng
+-+ * have been set up.
+-+ */
+-+#ifndef YY_USER_ACTION
+-+#define YY_USER_ACTION
+-+#endif
+-+
+-+/* Code executed at the end of each rule. */
+-+#ifndef YY_BREAK
+-+#define YY_BREAK break;
+-+#endif
+-+
+-+#define YY_RULE_SETUP \
+-+	YY_USER_ACTION
+-+
+-+YY_DECL
+-+	{
+-+	register yy_state_type yy_current_state;
+-+	register char *yy_cp, *yy_bp;
+-+	register int yy_act;
+-+
+-+#line 69 "emp_ematch.l"
+-+
+-+#line 641 "enp_ematch.lex.c"
+-+
+-+	if ( yy_init )
+-+		{
+-+		yy_init = 0;
+-+
+-+#ifdef YY_USER_INIT
+-+		YY_USER_INIT;
+-+#endif
+-+
+-+		if ( ! yy_start )
+-+			yy_start = 1;	/* first start state */
+-+
+-+		if ( ! yyin )
+-+			yyin = stdin;
+-+
+-+		if ( ! yyout )
+-+			yyout = stdout;
+-+
+-+		if ( ! yy_current_buffer )
+-+			yy_current_buffer =
+-+				yy_create_buffer( yyin, YY_BUF_SIZE );
+-+
+-+		yy_load_buffer_state();
+-+		}
+-+
+-+	while ( 1 )		/* loops until end-of-file is reached */
+-+		{
+-+		yy_cp = yy_c_buf_p;
+-+
+-+		/* Support of yytext. */
+-+		*yy_cp = yy_hold_char;
+-+
+-+		/* yy_bp points to the position in yy_ch_buf of the start of
+-+		 * the current run.
+-+		 */
+-+		yy_bp = yy_cp;
+-+
+-+		yy_current_state = yy_start;
+-+yy_match:
+-+		do
+-+			{
+-+			register YY_CHAR yy_c = yy_ec[YY_SC_TO_UI(*yy_cp)];
+-+			if ( yy_accept[yy_current_state] )
+-+				{
+-+				yy_last_accepting_state = yy_current_state;
+-+				yy_last_accepting_cpos = yy_cp;
+-+				}
+-+			while ( yy_chk[yy_base[yy_current_state] + yy_c] != yy_current_state )
+-+				{
+-+				yy_current_state = (int) yy_def[yy_current_state];
+-+				if ( yy_current_state >= 43 )
+-+					yy_c = yy_meta[(unsigned int) yy_c];
+-+				}
+-+			yy_current_state = yy_nxt[yy_base[yy_current_state] + (unsigned int) yy_c];
+-+			++yy_cp;
+-+			}
+-+		while ( yy_base[yy_current_state] != 91 );
+-+
+-+yy_find_action:
+-+		yy_act = yy_accept[yy_current_state];
+-+		if ( yy_act == 0 )
+-+			{ /* have to back up */
+-+			yy_cp = yy_last_accepting_cpos;
+-+			yy_current_state = yy_last_accepting_state;
+-+			yy_act = yy_accept[yy_current_state];
+-+			}
+-+
+-+		YY_DO_BEFORE_ACTION;
+-+
+-+
+-+do_action:	/* This label is used only to access EOF actions. */
+-+
+-+
+-+		switch ( yy_act )
+-+	{ /* beginning of action switch */
+-+			case 0: /* must back up */
+-+			/* undo the effects of YY_DO_BEFORE_ACTION */
+-+			*yy_cp = yy_hold_char;
+-+			yy_cp = yy_last_accepting_cpos;
+-+			yy_current_state = yy_last_accepting_state;
+-+			goto yy_find_action;
+-+
+-+case 1:
+-+YY_RULE_SETUP
+-+#line 70 "emp_ematch.l"
+-+
+-+	YY_BREAK
+-+case 2:
+-+YY_RULE_SETUP
+-+#line 72 "emp_ematch.l"
+-+{
+-+						if (strbuf == NULL) {
+-+							strbuf_size = 512;
+-+							strbuf = calloc(1, strbuf_size);
+-+							if (strbuf == NULL)
+-+								return ERROR;
+-+						}
+-+						strbuf_index = 0;
+-+						
+-+						BEGIN(str);
+-+					}
+-+	YY_BREAK
+-+case 3:
+-+YY_RULE_SETUP
+-+#line 84 "emp_ematch.l"
+-+{
+-+						BEGIN(INITIAL);
+-+						yylval.b = bstr_new(strbuf, strbuf_index);
+-+						yylval.b->quoted = 1;
+-+						return ATTRIBUTE;
+-+					}
+-+	YY_BREAK
+-+case 4:
+-+YY_RULE_SETUP
+-+#line 91 "emp_ematch.l"
+-+{ /* octal escape sequence */
+-+						int res;
+-+						
+-+						sscanf(yytext + 1, "%o", &res);
+-+						if (res > 0xFF) {
+-+							fprintf(stderr, "error: octal escape sequence" \
+-+							" out of range\n");
+-+							return ERROR;
+-+						}
+-+						strbuf_append_char((unsigned char) res);
+-+					}
+-+	YY_BREAK
+-+case 5:
+-+YY_RULE_SETUP
+-+#line 103 "emp_ematch.l"
+-+{ /* catch wrong octal escape seq. */
+-+						fprintf(stderr, "error: invalid octale escape sequence\n");
+-+						return ERROR;
+-+					}
+-+	YY_BREAK
+-+case 6:
+-+YY_RULE_SETUP
+-+#line 108 "emp_ematch.l"
+-+{
+-+						int res;
+-+						
+-+						sscanf(yytext + 2, "%x", &res);
+-+						
+-+						if (res > 0xFF) {
+-+							fprintf(stderr, "error: hexadecimal escape " \
+-+							"sequence out of range\n");
+-+							return ERROR;
+-+						}
+-+						strbuf_append_char((unsigned char) res);
+-+					}
+-+	YY_BREAK
+-+case 7:
+-+YY_RULE_SETUP
+-+#line 121 "emp_ematch.l"
+-+strbuf_append_char('\n');
+-+	YY_BREAK
+-+case 8:
+-+YY_RULE_SETUP
+-+#line 122 "emp_ematch.l"
+-+strbuf_append_char('\r');
+-+	YY_BREAK
+-+case 9:
+-+YY_RULE_SETUP
+-+#line 123 "emp_ematch.l"
+-+strbuf_append_char('\t');
+-+	YY_BREAK
+-+case 10:
+-+YY_RULE_SETUP
+-+#line 124 "emp_ematch.l"
+-+strbuf_append_char('\v');
+-+	YY_BREAK
+-+case 11:
+-+YY_RULE_SETUP
+-+#line 125 "emp_ematch.l"
+-+strbuf_append_char('\b');
+-+	YY_BREAK
+-+case 12:
+-+YY_RULE_SETUP
+-+#line 126 "emp_ematch.l"
+-+strbuf_append_char('\f');
+-+	YY_BREAK
+-+case 13:
+-+YY_RULE_SETUP
+-+#line 127 "emp_ematch.l"
+-+strbuf_append_char('\a');
+-+	YY_BREAK
+-+case 14:
+-+YY_RULE_SETUP
+-+#line 129 "emp_ematch.l"
+-+strbuf_append_char(yytext[1]);
+-+	YY_BREAK
+-+case 15:
+-+YY_RULE_SETUP
+-+#line 130 "emp_ematch.l"
+-+strbuf_append_charp(yytext);
+-+	YY_BREAK
+-+case 16:
+-+YY_RULE_SETUP
+-+#line 132 "emp_ematch.l"
+-+return AND;
+-+	YY_BREAK
+-+case 17:
+-+YY_RULE_SETUP
+-+#line 133 "emp_ematch.l"
+-+return OR;
+-+	YY_BREAK
+-+case 18:
+-+YY_RULE_SETUP
+-+#line 134 "emp_ematch.l"
+-+return NOT;
+-+	YY_BREAK
+-+case 19:
+-+#line 136 "emp_ematch.l"
+-+case 20:
+-+YY_RULE_SETUP
+-+#line 136 "emp_ematch.l"
+-+{
+-+						return yylval.i = *yytext;
+-+					}
+-+	YY_BREAK
+-+case 21:
+-+YY_RULE_SETUP
+-+#line 139 "emp_ematch.l"
+-+{
+-+						yylval.b = bstr_alloc(yytext);
+-+						if (yylval.b == NULL)
+-+							return ERROR;
+-+						return ATTRIBUTE;
+-+					}
+-+	YY_BREAK
+-+case 22:
+-+YY_RULE_SETUP
+-+#line 145 "emp_ematch.l"
+-+ECHO;
+-+	YY_BREAK
+-+#line 877 "enp_ematch.lex.c"
+-+case YY_STATE_EOF(INITIAL):
+-+case YY_STATE_EOF(str):
+-+	yyterminate();
+-+
+-+	case YY_END_OF_BUFFER:
+-+		{
+-+		/* Amount of text matched not including the EOB char. */
+-+		int yy_amount_of_matched_text = (int) (yy_cp - yytext_ptr) - 1;
+-+
+-+		/* Undo the effects of YY_DO_BEFORE_ACTION. */
+-+		*yy_cp = yy_hold_char;
+-+		YY_RESTORE_YY_MORE_OFFSET
+-+
+-+		if ( yy_current_buffer->yy_buffer_status == YY_BUFFER_NEW )
+-+			{
+-+			/* We're scanning a new file or input source.  It's
+-+			 * possible that this happened because the user
+-+			 * just pointed yyin at a new source and called
+-+			 * yylex().  If so, then we have to assure
+-+			 * consistency between yy_current_buffer and our
+-+			 * globals.  Here is the right place to do so, because
+-+			 * this is the first action (other than possibly a
+-+			 * back-up) that will match for the new input source.
+-+			 */
+-+			yy_n_chars = yy_current_buffer->yy_n_chars;
+-+			yy_current_buffer->yy_input_file = yyin;
+-+			yy_current_buffer->yy_buffer_status = YY_BUFFER_NORMAL;
+-+			}
+-+
+-+		/* Note that here we test for yy_c_buf_p "<=" to the position
+-+		 * of the first EOB in the buffer, since yy_c_buf_p will
+-+		 * already have been incremented past the NUL character
+-+		 * (since all states make transitions on EOB to the
+-+		 * end-of-buffer state).  Contrast this with the test
+-+		 * in input().
+-+		 */
+-+		if ( yy_c_buf_p <= &yy_current_buffer->yy_ch_buf[yy_n_chars] )
+-+			{ /* This was really a NUL. */
+-+			yy_state_type yy_next_state;
+-+
+-+			yy_c_buf_p = yytext_ptr + yy_amount_of_matched_text;
+-+
+-+			yy_current_state = yy_get_previous_state();
+-+
+-+			/* Okay, we're now positioned to make the NUL
+-+			 * transition.  We couldn't have
+-+			 * yy_get_previous_state() go ahead and do it
+-+			 * for us because it doesn't know how to deal
+-+			 * with the possibility of jamming (and we don't
+-+			 * want to build jamming into it because then it
+-+			 * will run more slowly).
+-+			 */
+-+
+-+			yy_next_state = yy_try_NUL_trans( yy_current_state );
+-+
+-+			yy_bp = yytext_ptr + YY_MORE_ADJ;
+-+
+-+			if ( yy_next_state )
+-+				{
+-+				/* Consume the NUL. */
+-+				yy_cp = ++yy_c_buf_p;
+-+				yy_current_state = yy_next_state;
+-+				goto yy_match;
+-+				}
+-+
+-+			else
+-+				{
+-+				yy_cp = yy_c_buf_p;
+-+				goto yy_find_action;
+-+				}
+-+			}
+-+
+-+		else switch ( yy_get_next_buffer() )
+-+			{
+-+			case EOB_ACT_END_OF_FILE:
+-+				{
+-+				yy_did_buffer_switch_on_eof = 0;
+-+
+-+				if ( yywrap() )
+-+					{
+-+					/* Note: because we've taken care in
+-+					 * yy_get_next_buffer() to have set up
+-+					 * yytext, we can now set up
+-+					 * yy_c_buf_p so that if some total
+-+					 * hoser (like flex itself) wants to
+-+					 * call the scanner after we return the
+-+					 * YY_NULL, it'll still work - another
+-+					 * YY_NULL will get returned.
+-+					 */
+-+					yy_c_buf_p = yytext_ptr + YY_MORE_ADJ;
+-+
+-+					yy_act = YY_STATE_EOF(YY_START);
+-+					goto do_action;
+-+					}
+-+
+-+				else
+-+					{
+-+					if ( ! yy_did_buffer_switch_on_eof )
+-+						YY_NEW_FILE;
+-+					}
+-+				break;
+-+				}
+-+
+-+			case EOB_ACT_CONTINUE_SCAN:
+-+				yy_c_buf_p =
+-+					yytext_ptr + yy_amount_of_matched_text;
+-+
+-+				yy_current_state = yy_get_previous_state();
+-+
+-+				yy_cp = yy_c_buf_p;
+-+				yy_bp = yytext_ptr + YY_MORE_ADJ;
+-+				goto yy_match;
+-+
+-+			case EOB_ACT_LAST_MATCH:
+-+				yy_c_buf_p =
+-+				&yy_current_buffer->yy_ch_buf[yy_n_chars];
+-+
+-+				yy_current_state = yy_get_previous_state();
+-+
+-+				yy_cp = yy_c_buf_p;
+-+				yy_bp = yytext_ptr + YY_MORE_ADJ;
+-+				goto yy_find_action;
+-+			}
+-+		break;
+-+		}
+-+
+-+	default:
+-+		YY_FATAL_ERROR(
+-+			"fatal flex scanner internal error--no action found" );
+-+	} /* end of action switch */
+-+		} /* end of scanning one token */
+-+	} /* end of yylex */
+-+
+-+
+-+/* yy_get_next_buffer - try to read in a new buffer
+-+ *
+-+ * Returns a code representing an action:
+-+ *	EOB_ACT_LAST_MATCH -
+-+ *	EOB_ACT_CONTINUE_SCAN - continue scanning from current position
+-+ *	EOB_ACT_END_OF_FILE - end of file
+-+ */
+-+
+-+static int yy_get_next_buffer()
+-+	{
+-+	register char *dest = yy_current_buffer->yy_ch_buf;
+-+	register char *source = yytext_ptr;
+-+	register int number_to_move, i;
+-+	int ret_val;
+-+
+-+	if ( yy_c_buf_p > &yy_current_buffer->yy_ch_buf[yy_n_chars + 1] )
+-+		YY_FATAL_ERROR(
+-+		"fatal flex scanner internal error--end of buffer missed" );
+-+
+-+	if ( yy_current_buffer->yy_fill_buffer == 0 )
+-+		{ /* Don't try to fill the buffer, so this is an EOF. */
+-+		if ( yy_c_buf_p - yytext_ptr - YY_MORE_ADJ == 1 )
+-+			{
+-+			/* We matched a single character, the EOB, so
+-+			 * treat this as a final EOF.
+-+			 */
+-+			return EOB_ACT_END_OF_FILE;
+-+			}
+-+
+-+		else
+-+			{
+-+			/* We matched some text prior to the EOB, first
+-+			 * process it.
+-+			 */
+-+			return EOB_ACT_LAST_MATCH;
+-+			}
+-+		}
+-+
+-+	/* Try to read more data. */
+-+
+-+	/* First move last chars to start of buffer. */
+-+	number_to_move = (int) (yy_c_buf_p - yytext_ptr) - 1;
+-+
+-+	for ( i = 0; i < number_to_move; ++i )
+-+		*(dest++) = *(source++);
+-+
+-+	if ( yy_current_buffer->yy_buffer_status == YY_BUFFER_EOF_PENDING )
+-+		/* don't do the read, it's not guaranteed to return an EOF,
+-+		 * just force an EOF
+-+		 */
+-+		yy_current_buffer->yy_n_chars = yy_n_chars = 0;
+-+
+-+	else
+-+		{
+-+		int num_to_read =
+-+			yy_current_buffer->yy_buf_size - number_to_move - 1;
+-+
+-+		while ( num_to_read <= 0 )
+-+			{ /* Not enough room in the buffer - grow it. */
+-+#ifdef YY_USES_REJECT
+-+			YY_FATAL_ERROR(
+-+"input buffer overflow, can't enlarge buffer because scanner uses REJECT" );
+-+#else
+-+
+-+			/* just a shorter name for the current buffer */
+-+			YY_BUFFER_STATE b = yy_current_buffer;
+-+
+-+			int yy_c_buf_p_offset =
+-+				(int) (yy_c_buf_p - b->yy_ch_buf);
+-+
+-+			if ( b->yy_is_our_buffer )
+-+				{
+-+				int new_size = b->yy_buf_size * 2;
+-+
+-+				if ( new_size <= 0 )
+-+					b->yy_buf_size += b->yy_buf_size / 8;
+-+				else
+-+					b->yy_buf_size *= 2;
+-+
+-+				b->yy_ch_buf = (char *)
+-+					/* Include room in for 2 EOB chars. */
+-+					yy_flex_realloc( (void *) b->yy_ch_buf,
+-+							 b->yy_buf_size + 2 );
+-+				}
+-+			else
+-+				/* Can't grow it, we don't own it. */
+-+				b->yy_ch_buf = 0;
+-+
+-+			if ( ! b->yy_ch_buf )
+-+				YY_FATAL_ERROR(
+-+				"fatal error - scanner input buffer overflow" );
+-+
+-+			yy_c_buf_p = &b->yy_ch_buf[yy_c_buf_p_offset];
+-+
+-+			num_to_read = yy_current_buffer->yy_buf_size -
+-+						number_to_move - 1;
+-+#endif
+-+			}
+-+
+-+		if ( num_to_read > YY_READ_BUF_SIZE )
+-+			num_to_read = YY_READ_BUF_SIZE;
+-+
+-+		/* Read in more data. */
+-+		YY_INPUT( (&yy_current_buffer->yy_ch_buf[number_to_move]),
+-+			yy_n_chars, num_to_read );
+-+
+-+		yy_current_buffer->yy_n_chars = yy_n_chars;
+-+		}
+-+
+-+	if ( yy_n_chars == 0 )
+-+		{
+-+		if ( number_to_move == YY_MORE_ADJ )
+-+			{
+-+			ret_val = EOB_ACT_END_OF_FILE;
+-+			yyrestart( yyin );
+-+			}
+-+
+-+		else
+-+			{
+-+			ret_val = EOB_ACT_LAST_MATCH;
+-+			yy_current_buffer->yy_buffer_status =
+-+				YY_BUFFER_EOF_PENDING;
+-+			}
+-+		}
+-+
+-+	else
+-+		ret_val = EOB_ACT_CONTINUE_SCAN;
+-+
+-+	yy_n_chars += number_to_move;
+-+	yy_current_buffer->yy_ch_buf[yy_n_chars] = YY_END_OF_BUFFER_CHAR;
+-+	yy_current_buffer->yy_ch_buf[yy_n_chars + 1] = YY_END_OF_BUFFER_CHAR;
+-+
+-+	yytext_ptr = &yy_current_buffer->yy_ch_buf[0];
+-+
+-+	return ret_val;
+-+	}
+-+
+-+
+-+/* yy_get_previous_state - get the state just before the EOB char was reached */
+-+
+-+static yy_state_type yy_get_previous_state()
+-+	{
+-+	register yy_state_type yy_current_state;
+-+	register char *yy_cp;
+-+
+-+	yy_current_state = yy_start;
+-+
+-+	for ( yy_cp = yytext_ptr + YY_MORE_ADJ; yy_cp < yy_c_buf_p; ++yy_cp )
+-+		{
+-+		register YY_CHAR yy_c = (*yy_cp ? yy_ec[YY_SC_TO_UI(*yy_cp)] : 1);
+-+		if ( yy_accept[yy_current_state] )
+-+			{
+-+			yy_last_accepting_state = yy_current_state;
+-+			yy_last_accepting_cpos = yy_cp;
+-+			}
+-+		while ( yy_chk[yy_base[yy_current_state] + yy_c] != yy_current_state )
+-+			{
+-+			yy_current_state = (int) yy_def[yy_current_state];
+-+			if ( yy_current_state >= 43 )
+-+				yy_c = yy_meta[(unsigned int) yy_c];
+-+			}
+-+		yy_current_state = yy_nxt[yy_base[yy_current_state] + (unsigned int) yy_c];
+-+		}
+-+
+-+	return yy_current_state;
+-+	}
+-+
+-+
+-+/* yy_try_NUL_trans - try to make a transition on the NUL character
+-+ *
+-+ * synopsis
+-+ *	next_state = yy_try_NUL_trans( current_state );
+-+ */
+-+
+-+#ifdef YY_USE_PROTOS
+-+static yy_state_type yy_try_NUL_trans( yy_state_type yy_current_state )
+-+#else
+-+static yy_state_type yy_try_NUL_trans( yy_current_state )
+-+yy_state_type yy_current_state;
+-+#endif
+-+	{
+-+	register int yy_is_jam;
+-+	register char *yy_cp = yy_c_buf_p;
+-+
+-+	register YY_CHAR yy_c = 1;
+-+	if ( yy_accept[yy_current_state] )
+-+		{
+-+		yy_last_accepting_state = yy_current_state;
+-+		yy_last_accepting_cpos = yy_cp;
+-+		}
+-+	while ( yy_chk[yy_base[yy_current_state] + yy_c] != yy_current_state )
+-+		{
+-+		yy_current_state = (int) yy_def[yy_current_state];
+-+		if ( yy_current_state >= 43 )
+-+			yy_c = yy_meta[(unsigned int) yy_c];
+-+		}
+-+	yy_current_state = yy_nxt[yy_base[yy_current_state] + (unsigned int) yy_c];
+-+	yy_is_jam = (yy_current_state == 42);
+-+
+-+	return yy_is_jam ? 0 : yy_current_state;
+-+	}
+-+
+-+
+-+#ifndef YY_NO_UNPUT
+-+#ifdef YY_USE_PROTOS
+-+static void yyunput( int c, register char *yy_bp )
+-+#else
+-+static void yyunput( c, yy_bp )
+-+int c;
+-+register char *yy_bp;
+-+#endif
+-+	{
+-+	register char *yy_cp = yy_c_buf_p;
+-+
+-+	/* undo effects of setting up yytext */
+-+	*yy_cp = yy_hold_char;
+-+
+-+	if ( yy_cp < yy_current_buffer->yy_ch_buf + 2 )
+-+		{ /* need to shift things up to make room */
+-+		/* +2 for EOB chars. */
+-+		register int number_to_move = yy_n_chars + 2;
+-+		register char *dest = &yy_current_buffer->yy_ch_buf[
+-+					yy_current_buffer->yy_buf_size + 2];
+-+		register char *source =
+-+				&yy_current_buffer->yy_ch_buf[number_to_move];
+-+
+-+		while ( source > yy_current_buffer->yy_ch_buf )
+-+			*--dest = *--source;
+-+
+-+		yy_cp += (int) (dest - source);
+-+		yy_bp += (int) (dest - source);
+-+		yy_current_buffer->yy_n_chars =
+-+			yy_n_chars = yy_current_buffer->yy_buf_size;
+-+
+-+		if ( yy_cp < yy_current_buffer->yy_ch_buf + 2 )
+-+			YY_FATAL_ERROR( "flex scanner push-back overflow" );
+-+		}
+-+
+-+	*--yy_cp = (char) c;
+-+
+-+
+-+	yytext_ptr = yy_bp;
+-+	yy_hold_char = *yy_cp;
+-+	yy_c_buf_p = yy_cp;
+-+	}
+-+#endif	/* ifndef YY_NO_UNPUT */
+-+
+-+
+-+#ifdef __cplusplus
+-+static int yyinput()
+-+#else
+-+static int input()
+-+#endif
+-+	{
+-+	int c;
+-+
+-+	*yy_c_buf_p = yy_hold_char;
+-+
+-+	if ( *yy_c_buf_p == YY_END_OF_BUFFER_CHAR )
+-+		{
+-+		/* yy_c_buf_p now points to the character we want to return.
+-+		 * If this occurs *before* the EOB characters, then it's a
+-+		 * valid NUL; if not, then we've hit the end of the buffer.
+-+		 */
+-+		if ( yy_c_buf_p < &yy_current_buffer->yy_ch_buf[yy_n_chars] )
+-+			/* This was really a NUL. */
+-+			*yy_c_buf_p = '\0';
+-+
+-+		else
+-+			{ /* need more input */
+-+			int offset = yy_c_buf_p - yytext_ptr;
+-+			++yy_c_buf_p;
+-+
+-+			switch ( yy_get_next_buffer() )
+-+				{
+-+				case EOB_ACT_LAST_MATCH:
+-+					/* This happens because yy_g_n_b()
+-+					 * sees that we've accumulated a
+-+					 * token and flags that we need to
+-+					 * try matching the token before
+-+					 * proceeding.  But for input(),
+-+					 * there's no matching to consider.
+-+					 * So convert the EOB_ACT_LAST_MATCH
+-+					 * to EOB_ACT_END_OF_FILE.
+-+					 */
+-+
+-+					/* Reset buffer status. */
+-+					yyrestart( yyin );
+-+
+-+					/* fall through */
+-+
+-+				case EOB_ACT_END_OF_FILE:
+-+					{
+-+					if ( yywrap() )
+-+						return EOF;
+-+
+-+					if ( ! yy_did_buffer_switch_on_eof )
+-+						YY_NEW_FILE;
+-+#ifdef __cplusplus
+-+					return yyinput();
+-+#else
+-+					return input();
+-+#endif
+-+					}
+-+
+-+				case EOB_ACT_CONTINUE_SCAN:
+-+					yy_c_buf_p = yytext_ptr + offset;
+-+					break;
+-+				}
+-+			}
+-+		}
+-+
+-+	c = *(unsigned char *) yy_c_buf_p;	/* cast for 8-bit char's */
+-+	*yy_c_buf_p = '\0';	/* preserve yytext */
+-+	yy_hold_char = *++yy_c_buf_p;
+-+
+-+
+-+	return c;
+-+	}
+-+
+-+
+-+#ifdef YY_USE_PROTOS
+-+void yyrestart( FILE *input_file )
+-+#else
+-+void yyrestart( input_file )
+-+FILE *input_file;
+-+#endif
+-+	{
+-+	if ( ! yy_current_buffer )
+-+		yy_current_buffer = yy_create_buffer( yyin, YY_BUF_SIZE );
+-+
+-+	yy_init_buffer( yy_current_buffer, input_file );
+-+	yy_load_buffer_state();
+-+	}
+-+
+-+
+-+#ifdef YY_USE_PROTOS
+-+void yy_switch_to_buffer( YY_BUFFER_STATE new_buffer )
+-+#else
+-+void yy_switch_to_buffer( new_buffer )
+-+YY_BUFFER_STATE new_buffer;
+-+#endif
+-+	{
+-+	if ( yy_current_buffer == new_buffer )
+-+		return;
+-+
+-+	if ( yy_current_buffer )
+-+		{
+-+		/* Flush out information for old buffer. */
+-+		*yy_c_buf_p = yy_hold_char;
+-+		yy_current_buffer->yy_buf_pos = yy_c_buf_p;
+-+		yy_current_buffer->yy_n_chars = yy_n_chars;
+-+		}
+-+
+-+	yy_current_buffer = new_buffer;
+-+	yy_load_buffer_state();
+-+
+-+	/* We don't actually know whether we did this switch during
+-+	 * EOF (yywrap()) processing, but the only time this flag
+-+	 * is looked at is after yywrap() is called, so it's safe
+-+	 * to go ahead and always set it.
+-+	 */
+-+	yy_did_buffer_switch_on_eof = 1;
+-+	}
+-+
+-+
+-+#ifdef YY_USE_PROTOS
+-+void yy_load_buffer_state( void )
+-+#else
+-+void yy_load_buffer_state()
+-+#endif
+-+	{
+-+	yy_n_chars = yy_current_buffer->yy_n_chars;
+-+	yytext_ptr = yy_c_buf_p = yy_current_buffer->yy_buf_pos;
+-+	yyin = yy_current_buffer->yy_input_file;
+-+	yy_hold_char = *yy_c_buf_p;
+-+	}
+-+
+-+
+-+#ifdef YY_USE_PROTOS
+-+YY_BUFFER_STATE yy_create_buffer( FILE *file, int size )
+-+#else
+-+YY_BUFFER_STATE yy_create_buffer( file, size )
+-+FILE *file;
+-+int size;
+-+#endif
+-+	{
+-+	YY_BUFFER_STATE b;
+-+
+-+	b = (YY_BUFFER_STATE) yy_flex_alloc( sizeof( struct yy_buffer_state ) );
+-+	if ( ! b )
+-+		YY_FATAL_ERROR( "out of dynamic memory in yy_create_buffer()" );
+-+
+-+	b->yy_buf_size = size;
+-+
+-+	/* yy_ch_buf has to be 2 characters longer than the size given because
+-+	 * we need to put in 2 end-of-buffer characters.
+-+	 */
+-+	b->yy_ch_buf = (char *) yy_flex_alloc( b->yy_buf_size + 2 );
+-+	if ( ! b->yy_ch_buf )
+-+		YY_FATAL_ERROR( "out of dynamic memory in yy_create_buffer()" );
+-+
+-+	b->yy_is_our_buffer = 1;
+-+
+-+	yy_init_buffer( b, file );
+-+
+-+	return b;
+-+	}
+-+
+-+
+-+#ifdef YY_USE_PROTOS
+-+void yy_delete_buffer( YY_BUFFER_STATE b )
+-+#else
+-+void yy_delete_buffer( b )
+-+YY_BUFFER_STATE b;
+-+#endif
+-+	{
+-+	if ( ! b )
+-+		return;
+-+
+-+	if ( b == yy_current_buffer )
+-+		yy_current_buffer = (YY_BUFFER_STATE) 0;
+-+
+-+	if ( b->yy_is_our_buffer )
+-+		yy_flex_free( (void *) b->yy_ch_buf );
+-+
+-+	yy_flex_free( (void *) b );
+-+	}
+-+
+-+
+-+#ifndef YY_ALWAYS_INTERACTIVE
+-+#ifndef YY_NEVER_INTERACTIVE
+-+extern int isatty YY_PROTO(( int ));
+-+#endif
+-+#endif
+-+
+-+#ifdef YY_USE_PROTOS
+-+void yy_init_buffer( YY_BUFFER_STATE b, FILE *file )
+-+#else
+-+void yy_init_buffer( b, file )
+-+YY_BUFFER_STATE b;
+-+FILE *file;
+-+#endif
+-+
+-+
+-+	{
+-+	yy_flush_buffer( b );
+-+
+-+	b->yy_input_file = file;
+-+	b->yy_fill_buffer = 1;
+-+
+-+#if YY_ALWAYS_INTERACTIVE
+-+	b->yy_is_interactive = 1;
+-+#else
+-+#if YY_NEVER_INTERACTIVE
+-+	b->yy_is_interactive = 0;
+-+#else
+-+	b->yy_is_interactive = file ? (isatty( fileno(file) ) > 0) : 0;
+-+#endif
+-+#endif
+-+	}
+-+
+-+
+-+#ifdef YY_USE_PROTOS
+-+void yy_flush_buffer( YY_BUFFER_STATE b )
+-+#else
+-+void yy_flush_buffer( b )
+-+YY_BUFFER_STATE b;
+-+#endif
+-+
+-+	{
+-+	if ( ! b )
+-+		return;
+-+
+-+	b->yy_n_chars = 0;
+-+
+-+	/* We always need two end-of-buffer characters.  The first causes
+-+	 * a transition to the end-of-buffer state.  The second causes
+-+	 * a jam in that state.
+-+	 */
+-+	b->yy_ch_buf[0] = YY_END_OF_BUFFER_CHAR;
+-+	b->yy_ch_buf[1] = YY_END_OF_BUFFER_CHAR;
+-+
+-+	b->yy_buf_pos = &b->yy_ch_buf[0];
+-+
+-+	b->yy_at_bol = 1;
+-+	b->yy_buffer_status = YY_BUFFER_NEW;
+-+
+-+	if ( b == yy_current_buffer )
+-+		yy_load_buffer_state();
+-+	}
+-+
+-+
+-+#ifndef YY_NO_SCAN_BUFFER
+-+#ifdef YY_USE_PROTOS
+-+YY_BUFFER_STATE yy_scan_buffer( char *base, yy_size_t size )
+-+#else
+-+YY_BUFFER_STATE yy_scan_buffer( base, size )
+-+char *base;
+-+yy_size_t size;
+-+#endif
+-+	{
+-+	YY_BUFFER_STATE b;
+-+
+-+	if ( size < 2 ||
+-+	     base[size-2] != YY_END_OF_BUFFER_CHAR ||
+-+	     base[size-1] != YY_END_OF_BUFFER_CHAR )
+-+		/* They forgot to leave room for the EOB's. */
+-+		return 0;
+-+
+-+	b = (YY_BUFFER_STATE) yy_flex_alloc( sizeof( struct yy_buffer_state ) );
+-+	if ( ! b )
+-+		YY_FATAL_ERROR( "out of dynamic memory in yy_scan_buffer()" );
+-+
+-+	b->yy_buf_size = size - 2;	/* "- 2" to take care of EOB's */
+-+	b->yy_buf_pos = b->yy_ch_buf = base;
+-+	b->yy_is_our_buffer = 0;
+-+	b->yy_input_file = 0;
+-+	b->yy_n_chars = b->yy_buf_size;
+-+	b->yy_is_interactive = 0;
+-+	b->yy_at_bol = 1;
+-+	b->yy_fill_buffer = 0;
+-+	b->yy_buffer_status = YY_BUFFER_NEW;
+-+
+-+	yy_switch_to_buffer( b );
+-+
+-+	return b;
+-+	}
+-+#endif
+-+
+-+
+-+#ifndef YY_NO_SCAN_STRING
+-+#ifdef YY_USE_PROTOS
+-+YY_BUFFER_STATE yy_scan_string( yyconst char *yy_str )
+-+#else
+-+YY_BUFFER_STATE yy_scan_string( yy_str )
+-+yyconst char *yy_str;
+-+#endif
+-+	{
+-+	int len;
+-+	for ( len = 0; yy_str[len]; ++len )
+-+		;
+-+
+-+	return yy_scan_bytes( yy_str, len );
+-+	}
+-+#endif
+-+
+-+
+-+#ifndef YY_NO_SCAN_BYTES
+-+#ifdef YY_USE_PROTOS
+-+YY_BUFFER_STATE yy_scan_bytes( yyconst char *bytes, int len )
+-+#else
+-+YY_BUFFER_STATE yy_scan_bytes( bytes, len )
+-+yyconst char *bytes;
+-+int len;
+-+#endif
+-+	{
+-+	YY_BUFFER_STATE b;
+-+	char *buf;
+-+	yy_size_t n;
+-+	int i;
+-+
+-+	/* Get memory for full buffer, including space for trailing EOB's. */
+-+	n = len + 2;
+-+	buf = (char *) yy_flex_alloc( n );
+-+	if ( ! buf )
+-+		YY_FATAL_ERROR( "out of dynamic memory in yy_scan_bytes()" );
+-+
+-+	for ( i = 0; i < len; ++i )
+-+		buf[i] = bytes[i];
+-+
+-+	buf[len] = buf[len+1] = YY_END_OF_BUFFER_CHAR;
+-+
+-+	b = yy_scan_buffer( buf, n );
+-+	if ( ! b )
+-+		YY_FATAL_ERROR( "bad buffer in yy_scan_bytes()" );
+-+
+-+	/* It's okay to grow etc. this buffer, and we should throw it
+-+	 * away when we're done.
+-+	 */
+-+	b->yy_is_our_buffer = 1;
+-+
+-+	return b;
+-+	}
+-+#endif
+-+
+-+
+-+#ifndef YY_NO_PUSH_STATE
+-+#ifdef YY_USE_PROTOS
+-+static void yy_push_state( int new_state )
+-+#else
+-+static void yy_push_state( new_state )
+-+int new_state;
+-+#endif
+-+	{
+-+	if ( yy_start_stack_ptr >= yy_start_stack_depth )
+-+		{
+-+		yy_size_t new_size;
+-+
+-+		yy_start_stack_depth += YY_START_STACK_INCR;
+-+		new_size = yy_start_stack_depth * sizeof( int );
+-+
+-+		if ( ! yy_start_stack )
+-+			yy_start_stack = (int *) yy_flex_alloc( new_size );
+-+
+-+		else
+-+			yy_start_stack = (int *) yy_flex_realloc(
+-+					(void *) yy_start_stack, new_size );
+-+
+-+		if ( ! yy_start_stack )
+-+			YY_FATAL_ERROR(
+-+			"out of memory expanding start-condition stack" );
+-+		}
+-+
+-+	yy_start_stack[yy_start_stack_ptr++] = YY_START;
+-+
+-+	BEGIN(new_state);
+-+	}
+-+#endif
+-+
+-+
+-+#ifndef YY_NO_POP_STATE
+-+static void yy_pop_state()
+-+	{
+-+	if ( --yy_start_stack_ptr < 0 )
+-+		YY_FATAL_ERROR( "start-condition stack underflow" );
+-+
+-+	BEGIN(yy_start_stack[yy_start_stack_ptr]);
+-+	}
+-+#endif
+-+
+-+
+-+#ifndef YY_NO_TOP_STATE
+-+static int yy_top_state()
+-+	{
+-+	return yy_start_stack[yy_start_stack_ptr - 1];
+-+	}
+-+#endif
+-+
+-+#ifndef YY_EXIT_FAILURE
+-+#define YY_EXIT_FAILURE 2
+-+#endif
+-+
+-+#ifdef YY_USE_PROTOS
+-+static void yy_fatal_error( yyconst char msg[] )
+-+#else
+-+static void yy_fatal_error( msg )
+-+char msg[];
+-+#endif
+-+	{
+-+	(void) fprintf( stderr, "%s\n", msg );
+-+	exit( YY_EXIT_FAILURE );
+-+	}
+-+
+-+
+-+
+-+/* Redefine yyless() so it works in section 3 code. */
+-+
+-+#undef yyless
+-+#define yyless(n) \
+-+	do \
+-+		{ \
+-+		/* Undo effects of setting up yytext. */ \
+-+		yytext[yyleng] = yy_hold_char; \
+-+		yy_c_buf_p = yytext + n; \
+-+		yy_hold_char = *yy_c_buf_p; \
+-+		*yy_c_buf_p = '\0'; \
+-+		yyleng = n; \
+-+		} \
+-+	while ( 0 )
+-+
+-+
+-+/* Internal utility routines. */
+-+
+-+#ifndef yytext_ptr
+-+#ifdef YY_USE_PROTOS
+-+static void yy_flex_strncpy( char *s1, yyconst char *s2, int n )
+-+#else
+-+static void yy_flex_strncpy( s1, s2, n )
+-+char *s1;
+-+yyconst char *s2;
+-+int n;
+-+#endif
+-+	{
+-+	register int i;
+-+	for ( i = 0; i < n; ++i )
+-+		s1[i] = s2[i];
+-+	}
+-+#endif
+-+
+-+#ifdef YY_NEED_STRLEN
+-+#ifdef YY_USE_PROTOS
+-+static int yy_flex_strlen( yyconst char *s )
+-+#else
+-+static int yy_flex_strlen( s )
+-+yyconst char *s;
+-+#endif
+-+	{
+-+	register int n;
+-+	for ( n = 0; s[n]; ++n )
+-+		;
+-+
+-+	return n;
+-+	}
+-+#endif
+-+
+-+
+-+#ifdef YY_USE_PROTOS
+-+static void *yy_flex_alloc( yy_size_t size )
+-+#else
+-+static void *yy_flex_alloc( size )
+-+yy_size_t size;
+-+#endif
+-+	{
+-+	return (void *) malloc( size );
+-+	}
+-+
+-+#ifdef YY_USE_PROTOS
+-+static void *yy_flex_realloc( void *ptr, yy_size_t size )
+-+#else
+-+static void *yy_flex_realloc( ptr, size )
+-+void *ptr;
+-+yy_size_t size;
+-+#endif
+-+	{
+-+	/* The cast to (char *) in the following accommodates both
+-+	 * implementations that use char* generic pointers, and those
+-+	 * that use void* generic pointers.  It works with the latter
+-+	 * because both ANSI C and C++ allow castless assignment from
+-+	 * any pointer type to void*, and deal with argument conversions
+-+	 * as though doing an assignment.
+-+	 */
+-+	return (void *) realloc( (char *) ptr, size );
+-+	}
+-+
+-+#ifdef YY_USE_PROTOS
+-+static void yy_flex_free( void *ptr )
+-+#else
+-+static void yy_flex_free( ptr )
+-+void *ptr;
+-+#endif
+-+	{
+-+	free( ptr );
+-+	}
+-+
+-+#if YY_MAIN
+-+int main()
+-+	{
+-+	yylex();
+-+	return 0;
+-+	}
+-+#endif
+-+#line 145 "emp_ematch.l"
+-+
+diff --git a/package/iproute2/patches/006-iproute2-tc_esfq.patch b/package/iproute2/patches/006-iproute2-tc_esfq.patch
+deleted file mode 100644
+index 65dbc4f..0000000
+--- a/package/iproute2/patches/006-iproute2-tc_esfq.patch
++++ /dev/null
+@@ -1,298 +0,0 @@
+----
+- include/linux/pkt_sched.h |   59 +++++++++++++
+- tc/Makefile               |    1 
+- tc/q_esfq.c               |  200 ++++++++++++++++++++++++++++++++++++++++++++++
+- 3 files changed, 260 insertions(+)
+-
+---- a/include/linux/pkt_sched.h
+-+++ b/include/linux/pkt_sched.h
+-@@ -174,8 +174,38 @@ struct tc_sfq_qopt
+-  *
+-  *	The only reason for this is efficiency, it is possible
+-  *	to change these parameters in compile time.
+-+ *
+-+ *	If you need to play with these values use esfq instead.
+-  */
+- 
+-+/* ESFQ section */
+-+
+-+enum
+-+{
+-+	/* traditional */
+-+	TCA_SFQ_HASH_CLASSIC,
+-+	TCA_SFQ_HASH_DST,
+-+	TCA_SFQ_HASH_SRC,
+-+	/* conntrack */
+-+	TCA_SFQ_HASH_CTORIGDST,
+-+	TCA_SFQ_HASH_CTORIGSRC,
+-+	TCA_SFQ_HASH_CTREPLDST,
+-+	TCA_SFQ_HASH_CTREPLSRC,
+-+	TCA_SFQ_HASH_CTNATCHG,
+-+};
+-+
+-+struct tc_esfq_qopt
+-+{
+-+	unsigned	quantum;	/* Bytes per round allocated to flow */
+-+	int		perturb_period;	/* Period of hash perturbation */
+-+	__u32		limit;		/* Maximal packets in queue */
+-+	unsigned	divisor;	/* Hash divisor  */
+-+	unsigned	flows;		/* Maximal number of flows  */
+-+	unsigned        hash_kind;      /* Hash function to use for flow identification */
+-+};
+-+
+-+
+-+
+- /* RED section */
+- 
+- enum
+-@@ -579,8 +609,37 @@ struct tc_sfq_xstats {
+-  *
+-  *	The only reason for this is efficiency, it is possible
+-  *	to change these parameters in compile time.
+-+ *
+-+ *	If you need to play with these values use esfq instead.
+-  */
+- 
+-+/* ESFQ section */
+-+
+-+enum
+-+{
+-+	/* traditional */
+-+	TCA_SFQ_HASH_CLASSIC,
+-+	TCA_SFQ_HASH_DST,
+-+	TCA_SFQ_HASH_SRC,
+-+	/* conntrack */
+-+	TCA_SFQ_HASH_CTORIGDST,
+-+	TCA_SFQ_HASH_CTORIGSRC,
+-+	TCA_SFQ_HASH_CTREPLDST,
+-+	TCA_SFQ_HASH_CTREPLSRC,
+-+	TCA_SFQ_HASH_CTNATCHG,
+-+};
+-+
+-+struct tc_esfq_qopt
+-+{
+-+	unsigned	quantum;	/* Bytes per round allocated to flow */
+-+	int		perturb_period;	/* Period of hash perturbation */
+-+	__u32		limit;		/* Maximal packets in queue */
+-+	unsigned	divisor;	/* Hash divisor  */
+-+	unsigned	flows;		/* Maximal number of flows  */
+-+	unsigned        hash_kind;      /* Hash function to use for flow identification */
+-+};
+-+
+-+
+- /* RED section */
+- 
+- enum {
+---- a/tc/Makefile
+-+++ b/tc/Makefile
+-@@ -8,6 +8,7 @@ SHARED_LIBS ?= y
+- TCMODULES :=
+- TCMODULES += q_fifo.o
+- TCMODULES += q_sfq.o
+-+TCMODULES += q_esfq.o
+- TCMODULES += q_red.o
+- TCMODULES += q_prio.o
+- TCMODULES += q_tbf.o
+---- /dev/null
+-+++ b/tc/q_esfq.c
+-@@ -0,0 +1,200 @@
+-+/*
+-+ * q_esfq.c		ESFQ.
+-+ *
+-+ *		This program is free software; you can redistribute it and/or
+-+ *		modify it under the terms of the GNU General Public License
+-+ *		as published by the Free Software Foundation; either version
+-+ *		2 of the License, or (at your option) any later version.
+-+ *
+-+ * Authors:	Alexey Kuznetsov, <kuznet@ms2.inr.ac.ru>
+-+ *
+-+ * Changes:	Alexander Atanasov, <alex@ssi.bg>
+-+ *		Alexander Clouter, <alex@digriz.org.uk>
+-+ *		Corey Hickey, <bugfood-c@fatooh.org>
+-+ *
+-+ */
+-+
+-+#include <stdio.h>
+-+#include <stdlib.h>
+-+#include <unistd.h>
+-+#include <syslog.h>
+-+#include <fcntl.h>
+-+#include <math.h>
+-+#include <sys/socket.h>
+-+#include <netinet/in.h>
+-+#include <arpa/inet.h>
+-+#include <string.h>
+-+
+-+#include "utils.h"
+-+#include "tc_util.h"
+-+
+-+static void explain(void)
+-+{
+-+	fprintf(stderr, "Usage: ... esfq [ perturb SECS ] [ quantum BYTES ] [ depth FLOWS ]\n\t[ divisor HASHBITS ] [ limit PKTS ] [ hash HASHTYPE]\n");
+-+	fprintf(stderr,"Where: \n");
+-+	fprintf(stderr,"HASHTYPE := { classic | src | dst | ctorigdst | ctorigsrc | ctrepldst | ctreplsrc | ctnatchg }\n");
+-+}
+-+
+-+#define usage() return(-1)
+-+
+-+static int esfq_parse_opt(struct qdisc_util *qu, int argc, char **argv, struct nlmsghdr *n)
+-+{
+-+	int ok=0;
+-+	struct tc_esfq_qopt opt;
+-+
+-+	memset(&opt, 0, sizeof(opt));
+-+
+-+	opt.hash_kind= TCA_SFQ_HASH_CLASSIC;
+-+
+-+	while (argc > 0) {
+-+		if (strcmp(*argv, "quantum") == 0) {
+-+			NEXT_ARG();
+-+			if (get_size(&opt.quantum, *argv)) {
+-+				fprintf(stderr, "Illegal \"quantum\"\n");
+-+				return -1;
+-+			}
+-+			ok++;
+-+		} else if (strcmp(*argv, "perturb") == 0) {
+-+			NEXT_ARG();
+-+			if (get_integer(&opt.perturb_period, *argv, 0)) {
+-+				fprintf(stderr, "Illegal \"perturb\"\n");
+-+				return -1;
+-+			}
+-+			ok++;
+-+		} else if (strcmp(*argv, "depth") == 0) {
+-+			NEXT_ARG();
+-+			if (get_integer((int *) &opt.flows, *argv, 0)) {
+-+				fprintf(stderr, "Illegal \"depth\"\n");
+-+				return -1;
+-+			}
+-+			ok++;
+-+		} else if (strcmp(*argv, "divisor") == 0) {
+-+			NEXT_ARG();
+-+			if (get_integer((int *) &opt.divisor, *argv, 0)) {
+-+				fprintf(stderr, "Illegal \"divisor\"\n");
+-+				return -1;
+-+			}
+-+			if(opt.divisor >= 14) {
+-+				fprintf(stderr, "Illegal \"divisor\": must be < 14\n");
+-+				return -1;
+-+			}
+-+			opt.divisor=pow(2,opt.divisor);
+-+			ok++;
+-+		} else if (strcmp(*argv, "limit") == 0) {
+-+			NEXT_ARG();
+-+			if (get_integer((int *) &opt.limit, *argv, 0)) {
+-+				fprintf(stderr, "Illegal \"limit\"\n");
+-+				return -1;
+-+			}
+-+			ok++;
+-+		} else if (strcmp(*argv, "hash") == 0) {
+-+			NEXT_ARG();
+-+			if(strcmp(*argv, "classic") == 0) {
+-+				opt.hash_kind= TCA_SFQ_HASH_CLASSIC;
+-+			} else
+-+			if(strcmp(*argv, "dst") == 0) {
+-+				opt.hash_kind= TCA_SFQ_HASH_DST;
+-+			} else
+-+			if(strcmp(*argv, "src") == 0) {
+-+				opt.hash_kind= TCA_SFQ_HASH_SRC;
+-+			} else
+-+			if(strcmp(*argv, "ctorigsrc") == 0) {
+-+				opt.hash_kind= TCA_SFQ_HASH_CTORIGSRC;
+-+			} else
+-+			if(strcmp(*argv, "ctorigdst") == 0) {
+-+				opt.hash_kind= TCA_SFQ_HASH_CTORIGDST;
+-+			} else
+-+			if(strcmp(*argv, "ctreplsrc") == 0) {
+-+				opt.hash_kind= TCA_SFQ_HASH_CTREPLSRC;
+-+			} else
+-+			if(strcmp(*argv, "ctrepldst") == 0) {
+-+				opt.hash_kind= TCA_SFQ_HASH_CTREPLDST;
+-+			} else
+-+			if(strcmp(*argv, "ctnatchg") == 0) {
+-+				opt.hash_kind= TCA_SFQ_HASH_CTNATCHG;
+-+			} else {
+-+				fprintf(stderr, "Illegal \"hash\"\n");
+-+				explain();
+-+				return -1;
+-+			}
+-+			ok++;
+-+		} else if (strcmp(*argv, "help") == 0) {
+-+			explain();
+-+			return -1;
+-+		} else {
+-+			fprintf(stderr, "What is \"%s\"?\n", *argv);
+-+			explain();
+-+			return -1;
+-+		}
+-+		argc--; argv++;
+-+	}
+-+
+-+	if (ok)
+-+		addattr_l(n, 1024, TCA_OPTIONS, &opt, sizeof(opt));
+-+	return 0;
+-+}
+-+
+-+static int esfq_print_opt(struct qdisc_util *qu, FILE *f, struct rtattr *opt)
+-+{
+-+	struct tc_esfq_qopt *qopt;
+-+	SPRINT_BUF(b1);
+-+
+-+	if (opt == NULL)
+-+		return 0;
+-+
+-+	if (RTA_PAYLOAD(opt)  < sizeof(*qopt))
+-+		return -1;
+-+	qopt = RTA_DATA(opt);
+-+	fprintf(f, "quantum %s ", sprint_size(qopt->quantum, b1));
+-+	if (show_details) {
+-+		fprintf(f, "limit %up flows %u/%u ",
+-+			qopt->limit, qopt->flows, qopt->divisor);
+-+	}
+-+	if (qopt->perturb_period)
+-+		fprintf(f, "perturb %dsec ", qopt->perturb_period);
+-+
+-+		fprintf(f,"hash: ");
+-+	switch(qopt->hash_kind)
+-+	{
+-+	case TCA_SFQ_HASH_CLASSIC:
+-+		fprintf(f,"classic");
+-+		break;
+-+	case TCA_SFQ_HASH_DST:
+-+		fprintf(f,"dst");
+-+		break;
+-+	case TCA_SFQ_HASH_SRC:
+-+		fprintf(f,"src");
+-+		break;
+-+	case TCA_SFQ_HASH_CTORIGSRC:
+-+		fprintf(f,"ctorigsrc");
+-+		break;
+-+	case TCA_SFQ_HASH_CTORIGDST:
+-+		fprintf(f,"ctorigdst");
+-+		break;
+-+	case TCA_SFQ_HASH_CTREPLSRC:
+-+		fprintf(f,"ctreplsrc");
+-+		break;
+-+	case TCA_SFQ_HASH_CTREPLDST:
+-+		fprintf(f,"ctrepldst");
+-+		break;
+-+	case TCA_SFQ_HASH_CTNATCHG:
+-+		fprintf(f,"ctnatchg");
+-+		break;
+-+	default:
+-+		fprintf(f,"Unknown");
+-+	}
+-+	return 0;
+-+}
+-+
+-+static int esfq_print_xstats(struct qdisc_util *qu, FILE *f, struct rtattr *xstats)
+-+{
+-+	return 0;
+-+}
+-+
+-+
+-+struct qdisc_util esfq_qdisc_util = {
+-+	.id = "esfq",
+-+	.parse_qopt = esfq_parse_opt,
+-+	.print_qopt = esfq_print_opt,
+-+	.print_xstats = esfq_print_xstats,
+-+};
+diff --git a/package/iproute2/patches/007-version_includes.patch b/package/iproute2/patches/007-version_includes.patch
+deleted file mode 100644
+index 39bf49a..0000000
+--- a/package/iproute2/patches/007-version_includes.patch
++++ /dev/null
+@@ -1,17 +0,0 @@
+----
+- include/linux/netfilter_ipv4/ip_tables.h |    3 +++
+- 1 file changed, 3 insertions(+)
+-
+---- a/include/linux/netfilter_ipv4/ip_tables.h
+-+++ b/include/linux/netfilter_ipv4/ip_tables.h
+-@@ -113,7 +113,10 @@ struct ipt_entry {
+- #define IPT_CONTINUE XT_CONTINUE
+- #define IPT_RETURN XT_RETURN
+- 
+-+#include <linux/version.h> 
+-+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
+- #include <linux/netfilter/xt_tcpudp.h>
+-+#endif
+- #define ipt_udp xt_udp
+- #define ipt_tcp xt_tcp
+- 
+diff --git a/package/iproute2/patches/100-allow_pfifo_fast.patch b/package/iproute2/patches/100-allow_pfifo_fast.patch
+deleted file mode 100644
+index b31d4b7..0000000
+--- a/package/iproute2/patches/100-allow_pfifo_fast.patch
++++ /dev/null
+@@ -1,13 +0,0 @@
+----
+- tc/q_fifo.c |    1 +
+- 1 file changed, 1 insertion(+)
+-
+---- a/tc/q_fifo.c
+-+++ b/tc/q_fifo.c
+-@@ -98,5 +98,6 @@ struct qdisc_util pfifo_head_drop_qdisc_
+- extern int prio_print_opt(struct qdisc_util *qu, FILE *f, struct rtattr *opt);
+- struct qdisc_util pfifo_fast_qdisc_util = {
+- 	.id = "pfifo_fast",
+-+	.parse_qopt = fifo_parse_opt,
+- 	.print_qopt = prio_print_opt,
+- };
+diff --git a/package/iproute2/patches/200-act_connmark.patch b/package/iproute2/patches/200-act_connmark.patch
+index 561041f..557be50 100644
+--- a/package/iproute2/patches/200-act_connmark.patch
++++ b/package/iproute2/patches/200-act_connmark.patch
+@@ -1,13 +1,13 @@
+ --- a/tc/Makefile
+ +++ b/tc/Makefile
+-@@ -36,6 +36,7 @@ TCMODULES += m_mirred.o
++@@ -35,6 +35,7 @@ TCMODULES += m_gact.o
++ TCMODULES += m_mirred.o
+  TCMODULES += m_nat.o
+  TCMODULES += m_pedit.o
+- TCMODULES += m_skbedit.o
+ +TCMODULES += m_connmark.o
++ TCMODULES += m_skbedit.o
++ TCMODULES += m_csum.o
+  TCMODULES += p_ip.o
+- TCMODULES += p_icmp.o
+- TCMODULES += p_tcp.o
+ --- /dev/null
+ +++ b/tc/m_connmark.c
+ @@ -0,0 +1,71 @@
+-- 
+1.7.4.1
+

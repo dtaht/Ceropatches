@@ -1,0 +1,27 @@
+From 7467db71f6866e75123fa4be68beb518d8bfd99a Mon Sep 17 00:00:00 2001
+From: Dave Taht <d+bufferbloat@taht.net>
+Date: Sun, 24 Jul 2011 17:38:53 -0700
+Subject: [PATCH 03/13] ESFQ is ill-maintained, obsolete, and replaced by better features in SFQ.
+
+And SFB is the new hotness.
+---
+ package/kernel/modules/netsupport.mk |    3 +--
+ 1 files changed, 1 insertions(+), 2 deletions(-)
+
+diff --git a/package/kernel/modules/netsupport.mk b/package/kernel/modules/netsupport.mk
+index b845f07..f31799a 100644
+--- a/package/kernel/modules/netsupport.mk
++++ b/package/kernel/modules/netsupport.mk
+@@ -552,8 +552,7 @@ define KernelPackage/sched
+   KCONFIG:= \
+ 	CONFIG_NET_SCHED=y \
+ 	CONFIG_NET_SCH_DSMARK \
+-	CONFIG_NET_SCH_ESFQ \
+-	CONFIG_NET_SCH_ESFQ_NFCT=y \
++	CONFIG_NET_SCH_SFB \
+ 	CONFIG_NET_SCH_FIFO \
+ 	CONFIG_NET_SCH_GRED \
+ 	CONFIG_NET_SCH_HFSC \
+-- 
+1.7.4.1
+

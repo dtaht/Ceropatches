@@ -1,0 +1,40 @@
+From e63e4669285543d17d76a4e8bd057a4d22c3b701 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Dave=20T=C3=A4ht?= <d+bufferbloat@taht.net>
+Date: Wed, 10 Aug 2011 23:34:06 -0700
+Subject: [PATCH 12/13] bumped kernel to 2.6.39.4
+
+---
+ include/kernel-version.mk    |    3 +++
+ target/linux/ar71xx/Makefile |    2 +-
+ 2 files changed, 4 insertions(+), 1 deletions(-)
+
+diff --git a/include/kernel-version.mk b/include/kernel-version.mk
+index 6161d12..a9ec40a 100644
+--- a/include/kernel-version.mk
++++ b/include/kernel-version.mk
+@@ -29,6 +29,9 @@ endif
+ ifeq ($(LINUX_VERSION),2.6.39.2)
+   LINUX_KERNEL_MD5SUM:=51be93d92028658ec93f68b79a378b17
+ endif
++ifeq ($(LINUX_VERSION),2.6.39.4)
++  LINUX_KERNEL_MD5SUM:=a17c748c2070168f1e784e9605ca043d
++endif
+ ifeq ($(LINUX_VERSION),3.0.1)
+   LINUX_KERNEL_MD5SUM:=aed949984b878b7fb77ffe9cbee8ce0c
+ endif
+diff --git a/target/linux/ar71xx/Makefile b/target/linux/ar71xx/Makefile
+index d02504b..0925d9c 100644
+--- a/target/linux/ar71xx/Makefile
++++ b/target/linux/ar71xx/Makefile
+@@ -13,7 +13,7 @@ FEATURES:=squashfs jffs2 targz
+ CFLAGS:=-Os -pipe -mips32r2 -mtune=mips32r2 -fno-caller-saves
+ SUBTARGETS:=generic nand
+ 
+-LINUX_VERSION:=2.6.39.2
++LINUX_VERSION:=2.6.39.4
+ 
+ include $(INCLUDE_DIR)/target.mk
+ 
+-- 
+1.7.4.1
+

@@ -1,0 +1,31 @@
+From dec3a8ee5fe3f20bac1c0bfb5ade79c2c20b8963 Mon Sep 17 00:00:00 2001
+From: Dave Taht <d+bufferbloat@taht.net>
+Date: Sun, 24 Jul 2011 17:41:44 -0700
+Subject: [PATCH 04/13] Add drr and choke schedulers
+
+---
+ package/kernel/modules/netsupport.mk |    2 ++
+ 1 files changed, 2 insertions(+), 0 deletions(-)
+
+diff --git a/package/kernel/modules/netsupport.mk b/package/kernel/modules/netsupport.mk
+index f31799a..d900475 100644
+--- a/package/kernel/modules/netsupport.mk
++++ b/package/kernel/modules/netsupport.mk
+@@ -554,12 +554,14 @@ define KernelPackage/sched
+ 	CONFIG_NET_SCH_DSMARK \
+ 	CONFIG_NET_SCH_SFB \
+ 	CONFIG_NET_SCH_FIFO \
++	CONFIG_NET_SCH_DRR \
+ 	CONFIG_NET_SCH_GRED \
+ 	CONFIG_NET_SCH_HFSC \
+ 	CONFIG_NET_SCH_HTB \
+ 	CONFIG_NET_SCH_INGRESS \
+ 	CONFIG_NET_SCH_PRIO \
+ 	CONFIG_NET_SCH_RED \
++	CONFIG_NET_SCH_CHOKE \
+ 	CONFIG_NET_SCH_TBF \
+ 	CONFIG_NET_SCH_SFQ \
+ 	CONFIG_NET_SCH_TEQL \
+-- 
+1.7.4.1
+

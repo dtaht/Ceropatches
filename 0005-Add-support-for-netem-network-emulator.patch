@@ -1,0 +1,24 @@
+From 6fa4594e30c02a282439783f77fa3ec950326273 Mon Sep 17 00:00:00 2001
+From: Dave Taht <d+bufferbloat@taht.net>
+Date: Sun, 24 Jul 2011 17:42:14 -0700
+Subject: [PATCH 05/13] Add support for netem network emulator
+
+---
+ package/kernel/modules/netsupport.mk |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
+
+diff --git a/package/kernel/modules/netsupport.mk b/package/kernel/modules/netsupport.mk
+index d900475..8a763ec 100644
+--- a/package/kernel/modules/netsupport.mk
++++ b/package/kernel/modules/netsupport.mk
+@@ -565,6 +565,7 @@ define KernelPackage/sched
+ 	CONFIG_NET_SCH_TBF \
+ 	CONFIG_NET_SCH_SFQ \
+ 	CONFIG_NET_SCH_TEQL \
++	CONFIG_NET_SCH_NETEM \
+ 	CONFIG_NET_CLS=y \
+ 	CONFIG_NET_CLS_ACT=y \
+ 	CONFIG_NET_CLS_BASIC \
+-- 
+1.7.4.1
+

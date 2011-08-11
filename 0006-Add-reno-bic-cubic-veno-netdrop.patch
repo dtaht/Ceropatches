@@ -1,0 +1,25 @@
+From 55590527502d16e8bdf5ebfde08ce7f014bcd24b Mon Sep 17 00:00:00 2001
+From: Dave Taht <d+bufferbloat@taht.net>
+Date: Sun, 24 Jul 2011 17:43:48 -0700
+Subject: [PATCH 06/13] Add reno, bic, cubic, veno, netdrop
+
+---
+ target/linux/ar71xx/config-2.6.39 |    5 +++++
+ 1 files changed, 5 insertions(+), 0 deletions(-)
+
+diff --git a/target/linux/ar71xx/config-2.6.39 b/target/linux/ar71xx/config-2.6.39
+index 1af1cbc..b187afc 100644
+--- a/target/linux/ar71xx/config-2.6.39
++++ b/target/linux/ar71xx/config-2.6.39
+@@ -201,3 +201,8 @@ CONFIG_SYS_SUPPORTS_BIG_ENDIAN=y
+ CONFIG_USB_SUPPORT=y
+ CONFIG_XZ_DEC=y
+ CONFIG_ZONE_DMA_FLAG=0
++CONFIG_TCP_CONG_RENO=y
++CONFIG_TCP_CONG_BIC=y
++CONFIG_TCP_CONG_CUBIC=y
++CONFIG_TCP_CONG_VENO=y
++CONFIG_NET_DROP_MONITOR=y
+-- 
+1.7.4.1
+

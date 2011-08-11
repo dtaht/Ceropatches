@@ -1,0 +1,31 @@
+From 16a62572875d3e232291bcd0b6e4fbd97bf49d9a Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Dave=20T=C3=A4ht?= <d+bufferbloat@taht.net>
+Date: Wed, 10 Aug 2011 23:29:08 -0700
+Subject: [PATCH 01/13] restore inetd mode for dropbear
+
+---
+ package/dropbear/patches/120-openwrt_options.patch |    9 ---------
+ 1 files changed, 0 insertions(+), 9 deletions(-)
+
+diff --git a/package/dropbear/patches/120-openwrt_options.patch b/package/dropbear/patches/120-openwrt_options.patch
+index d1745e1..d9b0db4 100644
+--- a/package/dropbear/patches/120-openwrt_options.patch
++++ b/package/dropbear/patches/120-openwrt_options.patch
+@@ -1,14 +1,5 @@
+ --- a/options.h
+ +++ b/options.h
+-@@ -38,7 +38,7 @@
+-  * Both of these flags can be defined at once, don't compile without at least
+-  * one of them. */
+- #define NON_INETD_MODE
+--#define INETD_MODE
+-+/*#define INETD_MODE*/
+- 
+- /* Setting this disables the fast exptmod bignum code. It saves ~5kB, but is
+-  * perhaps 20% slower for pubkey operations (it is probably worth experimenting
+ @@ -49,7 +49,7 @@
+  several kB in binary size however will make the symmetrical ciphers and hashes
+  slower, perhaps by 50%. Recommended for small systems that aren't doing
+-- 
+1.7.4.1
+
